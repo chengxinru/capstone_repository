@@ -6,7 +6,7 @@ editor_options:
 ---
 
 Import libraries
-```{r, warining = F, message= F}
+```{r, warining = F}
 library(tidyverse)
 library(ggplot2)
 library(VIM)
@@ -18,9 +18,12 @@ import statement data
 ```{r}
 df <- fread('capstone_repository/data/allcol.csv', drop = 1)
 dim(df)
+
+#no missing value in the original statement data 
+colMeans(!is.na(df))
 ```
 
-Set up 
+Set up change id variables to character type, identify numeric columsn and categorical columns and logical columns
 ```{r}
 names(df)
 df$SimFinId <- as.character(df$SimFinId)
@@ -36,25 +39,32 @@ ratio <- copy(df)
 Current Ratio: Total Current Asset/ Total Current Liabilities 
 ```{r}
 #check if there are zeros or negative value that interrupt the calculation
-#liabilities can't be zero for the calculation to work
+#no negative values
 summary(ratio$Total.Current.Assets)
+#     Min.   1st Qu.    Median      Mean   3rd Qu.      Max. 
+#0.000e+00 1.646e+08 6.461e+08 3.452e+09 2.324e+09 2.031e+11
+sum(ratio$Total.Current.Assets == 0) #2
+
 summary(ratio$Total.Current.Liabilities)
+#     Min.   1st Qu.    Median      Mean   3rd Qu.      Max. 
+#0.000e+00 1.646e+08 6.461e+08 3.452e+09 2.324e+09 2.031e+11
+sum(ratio$Total.Current.Liabilities == 0) #2
+
 
 #start calculation
-ratio <- ratio %>% mutate(Current.Ratio = ifelse(Total.Current.Liabilities==0, NA, round(Total.Current.Assets/Total.Current.Liabilities,4)))
+ratio <- ratio %>% mutate(Current.Ratio = ifelse(Total.Current.Liabilities==0, NA, round(Total.Current.Assets/Total.Current.Liabilities,6)))
 
 #check result
-#only 0.01% invalid
-#0.02% zero
+#2 invalid(might need to drop later)
+#1 zero
 head(ratio[,c('Total.Current.Assets', 'Total.Current.Liabilities','Current.Ratio')])
-mean(is.na(ratio$Current.Ratio))
-mean(ratio$Current.Ratio == 0, na.rm = T)
+sum(is.na(ratio$Current.Ratio))
+sum(ratio$Current.Ratio == 0, na.rm = T)
 ```
 
 Quick Ratio: (Cash equivalent + Account receivable)/Total Current Liabilities
 ```{r}
 #check if there are zeros or negative value that interrupt the calculation
-#liabilities can't be zero for the calculation to work
 summary(ratio$Cash..Cash.Equivalents...Short.Term.Investments)
 #     Min.   1st Qu.    Median      Mean   3rd Qu.      Max. 
 #0.000e+00 3.780e+07 1.638e+08 1.231e+09 6.376e+08 1.338e+11 
@@ -66,150 +76,153 @@ summary(ratio$Total.Current.Liabilities)
 #0.000e+00 6.887e+07 3.601e+08 2.576e+09 1.635e+09 2.308e+11 
 
 #start calculation
-ratio <- ratio %>% mutate(Quick.Ratio = ifelse(Total.Current.Liabilities==0, NA, round((Cash..Cash.Equivalents...Short.Term.Investments + Accounts...Notes.Receivable)/Total.Current.Liabilities,4)))
+ratio <- ratio %>% mutate(Quick.Ratio = ifelse(Total.Current.Liabilities==0, NA, round((Cash..Cash.Equivalents...Short.Term.Investments + Accounts...Notes.Receivable)/Total.Current.Liabilities,6)))
 
 #check result
-#only 0.01% invalid
-# 0 zero
+#2 invalid
+#0 zero
 head(ratio[,c('Cash..Cash.Equivalents...Short.Term.Investments', 'Accounts...Notes.Receivable','Total.Current.Liabilities','Quick.Ratio')])
-mean(is.na(ratio$Quick.Ratio))
+sum(is.na(ratio$Quick.Ratio))
 mean(ratio$Quick.Ratio == 0, na.rm=T)
 ```
 
-Net working capital to asset ratio: (Total Current Assrt + Total Current Ratio)/ Total Current Asset
+Net working capital to asset ratio: (Total Current Asset - Total Current Liabilities)/ Total Current Asset
 ```{r}
-#check if there are zeros or negative value that interrupt the calculation
-#liabilities can't be zero for the calculation to work
-summary(ratio$Total.Current.Assets)
-summary(ratio$Total.Current.Liabilities)
-
 #start calculation
-ratio <- ratio %>% mutate(NWC.to.Asset.Ratio = ifelse(Total.Current.Assets==0, NA, round((Total.Current.Assets+Total.Current.Liabilities)/Total.Current.Assets,4)))
+ratio <- ratio %>% mutate(NWC.to.Asset.Ratio = ifelse(Total.Current.Assets==0, NA, round((Total.Current.Assets-Total.Current.Liabilities)/Total.Current.Assets,6)))
 
 #check result
-#only 0.01% invalid
-#0 zero
+#2 invalid
+#2380 zero(can be negative)
 head(ratio[,c('Total.Current.Assets', 'Total.Current.Liabilities','NWC.to.Asset.Ratio')])
-mean(is.na(ratio$NWC.to.Asset.Ratio))
-mean(ratio$NWC.to.Asset.Ratio == 0, na.rm = T)
+sum(is.na(ratio$NWC.to.Asset.Ratio))
+sum(ratio$NWC.to.Asset.Ratio == 0, na.rm = T)
+sum(ratio$NWC.to.Asset.Ratio < 0, na.rm = T)
 ```
 
-Cash Ratio: Cash Equivalent/ TOtal Current Liabilities
+Cash Ratio: Cash Equivalent/ Total Current Liabilities
 ```{r}
-#check if there are zeros or negative value that interrupt the calculation
-#liabilities can't be zero for the calculation to work
-summary(ratio$Cash..Cash.Equivalents...Short.Term.Investments)
-summary(ratio$Total.Current.Liabilities)
-
 #start calculation
-ratio <- ratio %>% mutate(Cash.Ratio = ifelse(Total.Current.Liabilities==0, NA, round(Cash..Cash.Equivalents...Short.Term.Investments/Total.Current.Liabilities,4)))
+ratio <- ratio %>% mutate(Cash.Ratio = ifelse(Total.Current.Liabilities==0, NA, round(Cash..Cash.Equivalents...Short.Term.Investments/Total.Current.Liabilities,6)))
 
 #check result
-#only 0.01% invalid
-#0.4% zero
+#2 invalid
+#57 zero
 head(ratio[,c('Cash..Cash.Equivalents...Short.Term.Investments', 'Total.Current.Liabilities','Cash.Ratio')])
-mean(is.na(ratio$Cash.Ratio))
-mean(ratio$Cash.Ratio == 0, na.rm = T)
+sum(is.na(ratio$Cash.Ratio))
+sum(ratio$Cash.Ratio == 0, na.rm = T)
 ```
 
 
 Long term Debt Ratio: Long term debt/(Long Term Debt + Total Equity)
 ```{r}
 #check if there are zeros or negative value that interrupt the calculation
-#some have negative value, but only 2 observation
 summary(ratio$Long.Term.Debt)
 #      Min.    1st Qu.     Median       Mean    3rd Qu.       Max. 
 #-3.480e+05  2.263e+08  5.630e+08  2.870e+09  2.207e+09  1.662e+11 
-sum(ratio$Long.Term.Debt < 0, na.rm = T)
-#Total Equity can be negative and that usually happens when the company is over-leveraged
+#check if the negative values are imputed
+sum(ratio$Long.Term.Debt <0 ) #2 negative,
+#Most negative liabilities are created in error, so their presence indicates problems with the underlying accounting system. need to make it NA
+
 summary(ratio$Total.Equity)
 #      Min.    1st Qu.     Median       Mean    3rd Qu.       Max. 
 #-1.453e+10  1.356e+08  7.464e+08  4.045e+09  2.894e+09  3.525e+11
-sum(ratio$Total.Equity < 0, na.rm = T)
+sum(ratio$Total.Equity < 0, na.rm = T) #717
+#Owner's equity can be reported as a negative on a balance sheet; however, if the owner's equity is negative, the company owes more than it is worth at that point in time.
+head(ratio[ratio$Total.Equity < 0, c('Total.Assets', 'Total.Liabilities', 'Total.Equity')])
+#the original data is correct, we don't need to process the data 
 
 #start calculation
-ratio <- ratio %>% mutate(Long.Term.Debt.Ratio = ifelse((Long.Term.Debt + Total.Equity)==0, NA, round(Long.Term.Debt/(Long.Term.Debt + Total.Equity),4)))
+ratio <- ratio %>% mutate(Long.Term.Debt.Ratio = ifelse(((Long.Term.Debt + Total.Equity)==0) | Long.Term.Debt <0 , NA, round(Long.Term.Debt/(Long.Term.Debt + Total.Equity),6)))
 
 #check result
-#0 NA
-#2.05% zero
-#0.736% negative (mostly due to negative Total.Equity )
+#2 NA
+#275 zero
+#101 negative
 head(ratio[,c('Total.Equity', 'Long.Term.Debt','Long.Term.Debt.Ratio')])
-mean(is.na(ratio$Long.Term.Debt.Ratio))
-mean(ratio$Long.Term.Debt.Ratio == 0, na.rm = T)
-mean(ratio$Long.Term.Debt.Ratio < 0, na.rm = T)
+sum(is.na(ratio$Long.Term.Debt.Ratio))
+sum(ratio$Long.Term.Debt.Ratio == 0, na.rm = T)
+sum(ratio$Long.Term.Debt.Ratio < 0, na.rm = T)
 ```
 
 Liabilities to Equity Ratio: Total Liabilities/ Total Equity
 ```{r}
 #check if there are zeros or negative value that interrupt the calculation
-#some have negative value, but only 15 observation
-#Technically, a negative liability is a company asset, and so should be classified as a prepaid expense.
 summary(ratio$Total.Liabilities)
 #      Min.    1st Qu.     Median       Mean    3rd Qu.       Max. 
 #-1.743e+09  1.363e+08  1.096e+09  6.952e+09  5.029e+09  3.553e+11 
-sum(ratio$Total.Liabilities <0, na.rm = T)
-summary(ratio$Total.Equity)
+sum(ratio$Total.Liabilities <0, na.rm = T) # 15
+#Most negative liabilities are created in error, so their presence indicates problems with the underlying accounting system. We want to make it NA
 
+summary(ratio$Total.Equity)
+#      Min.    1st Qu.     Median       Mean    3rd Qu.       Max. 
+#-1.453e+10  1.356e+08  7.464e+08  4.045e+09  2.894e+09  3.525e+11 
+sum(ratio$Total.Equity <0 ) #717, negative equity is red flag of the over-leveraging, keep it
 
 #start calculation
-ratio <- ratio %>% mutate(Liabilities.to.Equity.Ratio = ifelse(Total.Equity==0, NA, round(Total.Liabilities/Total.Equity,4)))
+ratio <- ratio %>% mutate(Liabilities.to.Equity.Ratio = ifelse((Total.Equity==0) | Total.Liabilities < 0, NA, round(Total.Liabilities/Total.Equity,6)))
 
 #check result
-#0.078 NA
-#0.014% zero
-#0.5.235% negative (mostly due to negative Total.Equity )
+#26 NA
+#2% zero
+#717% negative 
 head(ratio[,c('Total.Equity', 'Total.Liabilities','Liabilities.to.Equity.Ratio')])
-mean(is.na(ratio$Liabilities.to.Equity.Ratio))
-mean(ratio$Liabilities.to.Equity.Ratio == 0, na.rm = T)
-mean(ratio$Liabilities.to.Equity.Ratio < 0, na.rm = T)
+sum(is.na(ratio$Liabilities.to.Equity.Ratio))
+sum(ratio$Liabilities.to.Equity.Ratio == 0, na.rm = T)
+sum(ratio$Liabilities.to.Equity.Ratio < 0, na.rm = T)
 ```
 
 
 Total Debt Ratio: Total Liabilities/Total Assets
 ```{r}
 #check if there are zeros or negative value that interrupt the calculation
-#some have negative value, but only 15 observation
-#Technically, a negative liability is a company asset, and so should be classified as a prepaid expense.
 summary(ratio$Total.Liabilities)
+#      Min.    1st Qu.     Median       Mean    3rd Qu.       Max. 
+#-1.743e+09  1.363e+08  1.096e+09  6.952e+09  5.029e+09  3.553e+11 
+sum(ratio$Total.Liabilities<0) #15
 #Assets all positive
 summary(ratio$Total.Assets)
 
 
 #start calculation
-ratio <- ratio %>% mutate(Total.Debt.Ratio = ifelse(Total.Assets==0, NA, round(Total.Liabilities/Total.Assets,4)))
+ratio <- ratio %>% mutate(Total.Debt.Ratio = ifelse((Total.Assets==0) | Total.Liabilities <0, NA, round(Total.Liabilities/Total.Assets,6)))
 
 #check result
-#0 NA
-#0.014% zero
-#0.107% negative (mostly due to negative Total.Equity )
+#15 NA
+#2% zero
+#0% negative (mostly due to negative Total.Equity )
 head(ratio[,c('Total.Assets', 'Total.Liabilities','Total.Debt.Ratio')])
-mean(is.na(ratio$Total.Debt.Ratio))
-mean(ratio$Total.Debt.Ratio == 0, na.rm = T)
-mean(ratio$Total.Debt.Ratio < 0, na.rm = T)
+sum(is.na(ratio$Total.Debt.Ratio))
+sum(ratio$Total.Debt.Ratio == 0, na.rm = T)
+sum(ratio$Total.Debt.Ratio < 0, na.rm = T)
 ```
 
 Debt to Asset Ratio:(Long term Debt + Short Term Debt)/ Total Assets
 ```{r}
 #check if there are zeros or negative value that interrupt the calculation
-#some have negative value, but only 15 observation
-#Technically, a negative liability is a company asset, and so should be classified as a prepaid expense.
-summary(ratio$Total.Liabilities)
+
+summary(ratio$Long.Term.Debt)
+#      Min.    1st Qu.     Median       Mean    3rd Qu.       Max. 
+#-3.480e+05  2.263e+08  5.630e+08  2.870e+09  2.207e+09  1.662e+11
+sum(ratio$Long.Term.Debt <0) #2, need to make it NA
+summary(ratio$Short.Term.Debt)
+#     Min.   1st Qu.    Median      Mean   3rd Qu.      Max. 
+#0.000e+00 0.000e+00 3.536e+06 3.590e+08 8.896e+07 5.349e+10
 #Assets all positive
 summary(ratio$Total.Assets)
 
 
 #start calculation
-ratio <- ratio %>% mutate(Total.Debt.Ratio = ifelse(Total.Assets==0, NA, round(Total.Liabilities/Total.Assets,4)))
+ratio <- ratio %>% mutate(Debt.to.Asset.Ratio = ifelse((Total.Assets==0) | Long.Term.Debt <0, NA, round((Long.Term.Debt + Short.Term.Debt)/Total.Assets,6)))
 
 #check result
-#0 NA
-#0.014% zero
-#0.107% negative (mostly due to negative Total.Equity )
-head(ratio[,c('Total.Assets', 'Total.Liabilities','Total.Debt.Ratio')])
-mean(is.na(ratio$Total.Debt.Ratio))
-mean(ratio$Total.Debt.Ratio == 0, na.rm = T)
-mean(ratio$Total.Debt.Ratio < 0, na.rm = T)
+#2 NA
+#201 zero
+#0
+head(ratio[,c('Long.Term.Debt','Short.Term.Debt' ,'Total.Liabilities','Debt.to.Asset.Ratio')])
+sum(is.na(ratio$Debt.to.Asset.Ratio))
+sum(ratio$Debt.to.Asset.Ratio == 0, na.rm = T)
+sum(ratio$Debt.to.Asset.Ratio < 0, na.rm = T)
 ```
 
 
@@ -219,31 +232,31 @@ Interest Coverage Ratio: Operating Income/Interest expense
 summary(ratio$Operating.Income..Loss.)
 #      Min.    1st Qu.     Median       Mean    3rd Qu.       Max. 
 #-1.347e+10  9.540e+06  1.618e+08  9.877e+08  6.887e+08  1.425e+11 
-#expense are recorded as negative
 sum(ratio$Operating.Income..Loss. <0, na.rm = T)
-#2591
-#If a company has negative Operating Income, we still calculate this ratio - the figure will therefore be negative.
-
+#2591, it can be negative and very few of them are imputed 
 
 summary(ratio$Interest.Expense..Net)
-sum(ratio$Interest.Expense..Net > 0, na.rm = T)
-#1524
-#if interst expense is negative(positive in this case) then we set Interest Coverage to a high value so it can pass a high interest coverage screen. But since we are building a rergession model we may want to excluse this part of data. (ask Rodu)
+#      Min.    1st Qu.     Median       Mean    3rd Qu.       Max. 
+#-9.737e+09 -1.088e+08 -3.017e+07 -1.311e+08 -1.989e+06  1.537e+09 
+sum(ratio$Interest.Expense..Net < 0, na.rm = T)
+#12407, expense is recorded as negative
+#If you earned more income from interest that resulted in a positive interest gain
+#if we have interest gain,we need to set Interest Coverage to a high value so it can pass a high interest coverage screen. We may want to use mean to fill these 
 
 #start calculation
-ratio <- ratio %>% mutate(Interest.Coverage.Ratio = ifelse(Interest.Expense..Net==0, NA,
-                                                           ifelse(Interest.Expense..Net > 0, 100,round(Operating.Income..Loss./(-1*Interest.Expense..Net),4))))
+ratio <- ratio %>% mutate(Interest.Coverage.Ratio = ifelse((Interest.Expense..Net==0) | Interest.Expense..Net >0, NA, round(Operating.Income..Loss./(-1*Interest.Expense..Net),6)))
+mean <- mean(ratio$Interest.Coverage.Ratio, na.rm=T) #50.039
+ratio$Interest.Coverage.Ratio[ratio$Interest.Expense..Net>0] <- mean
+
 
 #check result
-#0.435 NA
-#0.0215% zero
-#14.5% negative 
+#61 NA
+#0 zero
+#2025 negative (due to negative operating income)
 head(ratio[,c('Operating.Income..Loss.', 'Interest.Expense..Net','Interest.Coverage.Ratio')])
-mean(is.na(ratio$Interest.Coverage.Ratio))
-mean(ratio$Interest.Coverage.Ratio == 0, na.rm = T)
-mean(ratio$Interest.Coverage.Ratio < 0, na.rm = T)
-#very spreadout
-summary(ratio$Interest.Coverage.Ratio)
+sum(is.na(ratio$Interest.Coverage.Ratio))
+sum(ratio$Interest.Coverage.Ratio == 0, na.rm = T)
+sum(ratio$Interest.Coverage.Ratio < 0, na.rm = T)
 ```
 
 Cash Coverage Ratio:(Operating Income + Depreciation)/Interest expense
@@ -252,28 +265,29 @@ Cash Coverage Ratio:(Operating Income + Depreciation)/Interest expense
 summary(ratio$Operating.Income..Loss.)
 #      Min.    1st Qu.     Median       Mean    3rd Qu.       Max. 
 #-1.347e+10  9.540e+06  1.618e+08  9.877e+08  6.887e+08  1.425e+11 
-#expense are recorded as negative
-sum(ratio$Operating.Income..Loss. <0, na.rm = T)
-#2591
+sum(ratio$Operating.Income..Loss. <0, na.rm = T)#2591
+
 summary(ratio$Depreciation...Amortization)
-sum(ratio$Depreciation...Amortization > 0, na.rm = T)
-#13971
-#if interst expense is negative(positive in this case) then we set Interest Coverage to a high value so it can pass a high interest coverage screen. But since we are building a rergession model we may want to excluse this part of data. (ask Rodu)
+#      Min.    1st Qu.     Median       Mean    3rd Qu.       Max. 
+#-1.069e+09  1.158e+07  6.977e+07  4.150e+08  2.704e+08  3.876e+10 
+sum(ratio$Depreciation...Amortization > 0, na.rm = T)#13971
+#Negative depreciation, on the other hand, accounts for the opposite process of an asset gaining value over time. There is nothing wrong
 
 #start calculation
-ratio <- ratio %>% mutate(Cash.Coverage.Ratio = ifelse(Interest.Expense..Net==0, NA,
-                                                           ifelse(Interest.Expense..Net > 0, 100,round((Operating.Income..Loss. + Depreciation...Amortization)/(-1*Interest.Expense..Net),4))))
+#start calculation
+ratio <- ratio %>% mutate(Cash.Coverage.Ratio = ifelse(Interest.Expense..Net >= 0, NA, round((Operating.Income..Loss. + Depreciation...Amortization)/(-1*Interest.Expense..Net),6)))
+mean <- mean(ratio$Cash.Coverage.Ratio, na.rm=T) #74.08185
+ratio$Cash.Coverage.Ratio[ratio$Interest.Expense..Net>0] <- mean
+
 
 #check result
-#0.435 NA
+#61 NA
 #0 zero
-#10.53% negative 
+#1468 negative 
 head(ratio[,c('Operating.Income..Loss.', 'Interest.Expense..Net','Depreciation...Amortization','Cash.Coverage.Ratio')])
-mean(is.na(ratio$Cash.Coverage.Ratio))
-mean(ratio$Cash.Coverage.Ratio == 0, na.rm = T)
-mean(ratio$Cash.Coverage.Ratio < 0, na.rm = T)
-#very spreadout
-summary(ratio$Interest.Coverage.Ratio)
+sum(is.na(ratio$Cash.Coverage.Ratio))
+sum(ratio$Cash.Coverage.Ratio == 0, na.rm = T)
+sum(ratio$Cash.Coverage.Ratio < 0, na.rm = T)
 ```
 
 
@@ -285,29 +299,28 @@ summary(ratio$Revenue)
 summary(ratio$Operating.Expenses)
 #      Min.    1st Qu.     Median       Mean    3rd Qu.       Max. 
 #-1.071e+11 -1.316e+09 -3.988e+08 -1.748e+09 -1.013e+08  1.110e+09 
-sum(ratio$Operating.Expenses > 0 , na.rm = T)
-#4
+sum(ratio$Operating.Expenses > 0 , na.rm = T)#4, should be problem, make it NA
+
 summary(ratio$Depreciation...Amortization)      
 #     Min.    1st Qu.     Median       Mean    3rd Qu.       Max. 
 #-1.069e+09  1.158e+07  6.977e+07  4.150e+08  2.704e+08  3.876e+10 
-sum(ratio$Depreciation...Amortization < 0, na.rm = T)
-#11
+sum(ratio$Depreciation...Amortization < 0, na.rm = T) #11
 
 #start calculation
-ratio <- ratio %>% mutate(After.Tax.Operating.Income = Revenue - Depreciation...Amortization + Operating.Expenses)
+ratio <- ratio %>% mutate(After.Tax.Operating.Income = ifelse(Operating.Expenses >0,NA,Revenue - Depreciation...Amortization + Operating.Expenses))
 head(ratio[,c("Revenue", "Depreciation...Amortization", "Operating.Expenses", "After.Tax.Operating.Income")])
-sum(is.na(ratio$After.Tax.Operating.Income))
+sum(is.na(ratio$After.Tax.Operating.Income)) #4
+sum(ratio$After.Tax.Operating.Income <0, na.rm=T) #1229
+sum(ratio$After.Tax.Operating.Income ==0, na.rm =T) #1
 ```
 
 
 Return On Assets: After Tax Operating Income/Total Assets
 ```{r}
 summary(ratio$After.Tax.Operating.Income)
-#      Min.    1st Qu.     Median       Mean    3rd Qu.       Max. 
-#-1.112e+10  1.175e+08  8.770e+08  5.589e+09  3.380e+09  4.188e+11 
-sum(ratio$After.Tax.Operating.Income < 0 , na.rm = T)
-#1229
-#ROA can be negative 
+#      Min.    1st Qu.     Median       Mean    3rd Qu.       Max.       NA's 
+#-1.112e+10  1.174e+08  8.770e+08  5.589e+09  3.380e+09  4.188e+11          4 
+
 summary(ratio$Total.Assets)      
 #     Min.   1st Qu.    Median      Mean   3rd Qu.      Max. 
 #2.360e+02 3.702e+08 2.062e+09 1.100e+10 8.207e+09 7.078e+11 
@@ -315,7 +328,7 @@ summary(ratio$Total.Assets)
 
 #start calculation
 ratio <- ratio %>% mutate(Return.On.Assets = After.Tax.Operating.Income/Total.Assets)
-sum(is.na(ratio$Return.On.Assets))
+sum(is.na(ratio$Return.On.Assets))#4
 ```
 
 
@@ -323,26 +336,24 @@ sum(is.na(ratio$Return.On.Assets))
 Return On Capital: After Tax Operating Income/(Long Term Debt + Total Equity)
 ```{r}
 summary(ratio$After.Tax.Operating.Income)
-#      Min.    1st Qu.     Median       Mean    3rd Qu.       Max. 
-#-1.112e+10  1.175e+08  8.770e+08  5.589e+09  3.380e+09  4.188e+11 
+#      Min.    1st Qu.     Median       Mean    3rd Qu.       Max.       NA's 
+#-1.112e+10  1.174e+08  8.770e+08  5.589e+09  3.380e+09  4.188e+11          4 
 
 summary(ratio$Long.Term.Debt)      
 #      Min.    1st Qu.     Median       Mean    3rd Qu.       Max. 
 #-3.480e+05  2.263e+08  5.630e+08  2.870e+09  2.207e+09  1.662e+11 
-sum(ratio$Long.Term.Debt <= 0, na.rm = T)
-#277
+sum(ratio$Long.Term.Debt < 0) #2, make it NA
+
 
 summary(ratio$Total.Equity)
 #      Min.    1st Qu.     Median       Mean    3rd Qu.       Max. 
 #-1.453e+10  1.356e+08  7.464e+08  4.045e+09  2.894e+09  3.525e+11 
-sum(ratio$Total.Equity <= 0 , na.rm = T)
-#728
+sum(ratio$Total.Equity <0 , na.rm = T)#717
 
 #start calculation
-ratio <- ratio %>% mutate(Return.On.Capital = ifelse((Long.Term.Debt + Total.Equity) == 0,NA,After.Tax.Operating.Income/(Long.Term.Debt + Total.Equity)))
-sum(is.na(ratio$Return.On.Capital)) #0
-sum(ratio$Return.On.Capital <0)
-summary(ratio$Return.On.Capital)
+ratio <- ratio %>% mutate(Return.On.Capital = ifelse(((Long.Term.Debt + Total.Equity) == 0) | Long.Term.Debt <0,NA,After.Tax.Operating.Income/(Long.Term.Debt + Total.Equity)))
+sum(is.na(ratio$Return.On.Capital)) #6
+sum(ratio$Return.On.Capital <0, na.rm=T) #1255
 ```
 
 Return On Equity: After Tax Operating Income/Total Equity
@@ -350,22 +361,27 @@ Return On Equity: After Tax Operating Income/Total Equity
 summary(ratio$After.Tax.Operating.Income)
 #      Min.    1st Qu.     Median       Mean    3rd Qu.       Max. 
 #-1.112e+10  1.175e+08  8.770e+08  5.589e+09  3.380e+09  4.188e+11 
+sum(ratio$After.Tax.Operating.Income <0 , na.rm=T) #1229
 
 summary(ratio$Total.Equity)
 #      Min.    1st Qu.     Median       Mean    3rd Qu.       Max. 
 #-1.453e+10  1.356e+08  7.464e+08  4.045e+09  2.894e+09  3.525e+11 
-sum(ratio$Total.Equity <= 0 , na.rm = T)
-#728
+sum(ratio$Total.Equity < 0 , na.rm = T)
+#717
+
+#having positive profits and negative stockholder equity is more indicative of a potential future rebound than having negative profits and positive stockholder equity.So we need to differentiate the two 
 
 #start calculation
+#we need to create a indicator telling whether 
 ratio <- ratio %>% mutate(Return.On.Equity = ifelse( Total.Equity == 0,NA,After.Tax.Operating.Income/Total.Equity))
-sum(is.na(ratio$Return.On.Equity)) #11
+ratio <- mutate(ratio, ROE.bad.or.good = ifelse((After.Tax.Operating.Income <0) &(Total.Equity >0), 'bad', ifelse(!is.na(Return.On.Equity),'good', NA)))
+sum(is.na(ratio$Return.On.Equity)) #15
 sum(ratio$Return.On.Equity <0, na.rm=T) #1649
-summary(ratio$Return.On.Equity)
+sum(ratio$ROE.bad.or.good =='bad',na.rm=T) #1080
+sum(is.na(ratio$ROE.bad.or.good))#15, consistent
 ```
 
 Operating Profit Margin: Operating Income/ Revenue
-
 ```{r}
 summary(ratio$Operating.Income..Loss.)
 #      Min.    1st Qu.     Median       Mean    3rd Qu.       Max. 
@@ -382,7 +398,6 @@ sum(ratio$Revenue == 0 , na.rm = T) #53
 ratio <- ratio %>% mutate(Operating.Profit.Margin = ifelse( Revenue == 0,NA,Operating.Income..Loss./Revenue))
 sum(is.na(ratio$Operating.Profit.Margin)) #53
 sum(ratio$Operating.Profit.Margin <0, na.rm=T) #2539
-summary(ratio$Operating.Profit.Margin)
 ```
 
 
@@ -404,80 +419,69 @@ sum(ratio$Revenue == 0 , na.rm = T) #53
 ratio <- ratio %>% mutate(Net.Profit.Margin = ifelse( Revenue == 0,NA,Net.Income..Common./Revenue))
 sum(is.na(ratio$Net.Profit.Margin)) #53
 sum(ratio$Net.Profit.Margin <0, na.rm=T) #3563
-summary(ratio$Net.Profit.Margin)
 ```
 
 Asset Turnover; Revenue/Total Asset(year-start)
 ```{r, message warning}
-#每个公司的数据量都不一样
-ratio <- as.data.table(ratio)
-
 #create a variable of year-start total asset
+ratio <- as.data.table(ratio)
 ratio[, Total.Assets.year.start := shift(Total.Assets, 1, 'lag'), by = Ticker]
 head(ratio[,c("Ticker","Total.Assets", "Total.Assets.year.start")], 20)
-mean(is.na(ratio$Total.Assets.year.start)) # 12.5% missing
-mean(ratio$Total.Assets.year.start ==0, na.rm = T) #0 zero
+sum(is.na(ratio$Total.Assets.year.start)) # 1750%missing
+sum(ratio$Total.Assets.year.start ==0, na.rm = T) #0 zero
 #complete
 
 #calculate ratio
 ratio <- ratio %>% mutate(Asset.Turnover = ifelse( Total.Assets.year.start == 0,NA,Revenue/Total.Assets.year.start))
-mean(is.na(ratio$Asset.Turnover)) #1750
+sum(is.na(ratio$Asset.Turnover)) #1750
 sum(ratio$Asset.Turnover <0, na.rm=T) #0
-summary(ratio$Asset.Turnover)
 ```
 
 
 
 Receivable Turnover: Revenue/Account receivable year start
 ```{r, message warning}
-#每个公司的数据量都不一样
-ratio <- as.data.table(ratio)
 #create a variable of year-start account receivable
+ratio <- as.data.table(ratio)
 ratio[, Accounts...Notes.Receivable.year.start := shift(Accounts...Notes.Receivable, 1, 'lag'), by = Ticker]
 
 head(ratio[,c("Ticker","Accounts...Notes.Receivable", "Accounts...Notes.Receivable.year.start")], 20)
-mean(is.na(ratio$Accounts...Notes.Receivable.year.start)) # 12.5% missing
+sum(is.na(ratio$Accounts...Notes.Receivable.year.start)) # 1750 missing
 sum(ratio$Accounts...Notes.Receivable.year.start ==0, na.rm = T) #14 zero
-#complete
+
 
 #calculate ratio
 ratio <- ratio %>% mutate(Receivable.Turnover = ifelse(Accounts...Notes.Receivable.year.start == 0, NA, Revenue/Accounts...Notes.Receivable.year.start))
 
 sum(is.na(ratio$Receivable.Turnover)) #1764
 sum(ratio$Receivable.Turnover <0, na.rm=T) #0
-summary(ratio$Receivable.Turnover)
 ```
 
 
 Inventory Turnover: Cost of Revenue/Inventory(year-start)
-- we may need to drop this
-```{r, message warning}
+- we drop this because 
+1. inventory has too many missing values 
+2. Cost.of.Revenue has many postive values which is weird. 
+```{r}
+#create a variable of year-start inventory
 ratio <- as.data.table(ratio)
-#create a variable of year-start account receivable
 ratio[, Inventories.year.start := shift(Inventories, 1, 'lag'), by = Ticker]
 
 head(ratio[,c("Ticker","Inventories", "Inventories.year.start")], 20)
-mean(is.na(ratio$Inventories.year.start)) # 12.5% missing
+sum(is.na(ratio$Inventories.year.start)) # 1750 missing
 sum(ratio$Inventories.year.start ==0, na.rm = T) #3634 zero
-summary(ratio$Inventories.year.start)
 
 summary(ratio$Cost.of.Revenue)
 #      Min.    1st Qu.     Median       Mean    3rd Qu.       Max. 
 #-3.853e+11 -3.051e+09 -7.931e+08 -5.075e+09 -1.251e+08  3.946e+09 
 sum(ratio$Cost.of.Revenue >0 , na.rm = T) #626
-
-#calculate ratio
-ratio <- ratio %>% mutate(Inventory.Turnover = ifelse((Inventories.year.start == 0|Cost.of.Revenue >0), NA, (-1*Cost.of.Revenue)/Inventories.year.start))
-
-sum(is.na(ratio$Inventory.Turnover)) #5416
-sum(ratio$Inventory.Turnover <0, na.rm=T) #0
-summary(ratio$Inventory.Turnover)
 ```
+
 
 Market to Book Ratio: Stcok Price(year-end) * Shares(basic)/ Total Equity 
 ```{r}
 #import stock price data
-stock <- fread('capstone_repository/data/us-shareprices-daily.csv')
+stock <- fread('simfin_data/us-shareprices-daily.csv')
 stock$Year <- str_split_fixed(stock$Date,"-", n=3)[,1]
 stock$Date2 <- str_remove_all(stock$Date, "-")
 head(stock)
@@ -491,7 +495,7 @@ dim(end_price)
 ratio$Fiscal.Year <- as.character(ratio$Fiscal.Year)
 end_price$SimFinId <- as.character(end_price$SimFinId)
 ratio <- left_join(ratio,end_price, by= c("Ticker", "SimFinId", "Fiscal.Year" = "Year"))
-mean(is.na(ratio$Close)) #5.5% missing, all because these comapnies are missing in stock price dataset
+sum(is.na(ratio$Close)) #777 missing, all because these comapnies are missing in stock price dataset
 
 
 #explore
@@ -502,16 +506,17 @@ summary(ratio$Shares..Diluted.)
 #     Min.   1st Qu.    Median      Mean   3rd Qu.      Max. 
 #1.400e+01 2.822e+07 7.300e+07 2.478e+08 2.119e+08 8.996e+09
 summary(ratio$Total.Equity)
+#      Min.    1st Qu.     Median       Mean    3rd Qu.       Max. 
+#-1.453e+10  1.356e+08  7.464e+08  4.045e+09  2.894e+09  3.525e+11 
 sum(ratio$Total.Equity==0, na.rm=T)#11
-
+sum(ratio$Total.Equity<0) #717
 
 
 #start calculation
 ratio <- ratio %>% mutate(Market.to.Book.Ratio = ifelse(Total.Equity ==0 , NA, (Close * Shares..Diluted.)/Total.Equity))
 
-sum(is.na(ratio$Market.to.Book.Ratio)) #776
+sum(is.na(ratio$Market.to.Book.Ratio)) #781
 sum(ratio$Market.to.Book.Ratio <0, na.rm=T) #573
-summary(ratio$Market.to.Book.Ratio)
 ```
 
 Earning Per Share: Net Income/ Shares
@@ -524,8 +529,6 @@ ratio <- ratio %>% mutate(Earning.Per.Share = ifelse(Shares..Diluted. ==0 , NA, 
 
 sum(is.na(ratio$Earning.Per.Share)) #0
 sum(ratio$Earning.Per.Share <0, na.rm=T) #3608
-summary(ratio$Earning.Per.Share)
-
 ```
 
 
@@ -539,8 +542,6 @@ ratio <- ratio %>% mutate(Sales.Per.Share = ifelse(Shares..Diluted. ==0 , NA, Re
 
 sum(is.na(ratio$Sales.Per.Share)) #0
 sum(ratio$Sales.Per.Share <0, na.rm=T) #0
-summary(ratio$Sales.Per.Share)
-
 ```
 
 
@@ -554,32 +555,39 @@ ratio <- ratio %>% mutate(Price.to.Earning.Ratio = ifelse(Earning.Per.Share ==0 
 
 sum(is.na(ratio$Price.to.Earning.Ratio)) #778
 sum(ratio$Price.to.Earning.Ratio <0, na.rm=T) #3193
-summary(ratio$Price.to.Earning.Ratio)
-
 ```
 
 
-Price to Book Ratio: Stcok Price/(Total Equity/Shares)
+Book to Market Ratio: (Total Equity/Shares)/ Stoke Price
 ```{r}
 summary(ratio$Close)
 summary(ratio$Total.Equity)
 summary(ratio$Shares..Diluted.)
 
 #start calculation 
-ratio <- ratio %>% mutate(Price.to.Book.Ratio = ifelse((Total.Equity/Shares..Diluted.) ==0 , NA, Close/(Total.Equity/Shares..Diluted.)))
+ratio <- ratio %>% mutate(Book.to.Market.Ratio = ifelse(Close ==0 , NA, (Total.Equity/Shares..Diluted.)/Close))
 
-sum(is.na(ratio$Price.to.Book.Ratio)) #776
-sum(ratio$Price.to.Book.Ratio <0, na.rm=T) #573
-summary(ratio$Price.to.Book.Ratio)
+sum(is.na(ratio$Book.to.Market.Ratio)) #777
+sum(ratio$Book.to.Market.Ratio <0, na.rm=T) #573
 
 ```
 
 
 
-select only ratio columns
+select only ratio columns, and drop rows with any missing value
 ```{r}
 names(ratio)
-final <- ratio[,c(1:8,37:57, 61:65)]
-dim(final)#[1] 13992    34
+final <- ratio[,c(1:8,37:46, 48:53, 55, 57, 62:66)]
+final_withoutmissing <- na.omit(final)
+dim(final)#[1] 13992    31
+dim(final_withoutmissing) #11718 31
+#we have 2297 rows with no missing values in technology sector 
+nrow(final_withoutmissing[final_withoutmissing$Sector == 'Technology',]) # 2297
 ```
+
+export data
+```{r}
+fwrite(final_withoutmissing, file = "capstone_repository/data/financial_ratios.csv")
+```
+
 
