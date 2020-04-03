@@ -54,6 +54,7 @@ sum(ratio$Total.Current.Liabilities == 0) #2
 #start calculation
 ratio <- ratio %>% mutate(Current.Ratio = ifelse(Total.Current.Liabilities==0, NA, round(Total.Current.Assets/Total.Current.Liabilities,6)))
 
+
 #check result
 #2 invalid(might need to drop later)
 #1 zero
@@ -91,6 +92,7 @@ Net working capital to asset ratio: (Total Current Asset - Total Current Liabili
 #start calculation
 ratio <- ratio %>% mutate(NWC.to.Asset.Ratio = ifelse(Total.Current.Assets==0, NA, round((Total.Current.Assets-Total.Current.Liabilities)/Total.Current.Assets,6)))
 
+
 #check result
 #2 invalid
 #2380 zero(can be negative)
@@ -104,6 +106,7 @@ Cash Ratio: Cash Equivalent/ Total Current Liabilities
 ```{r}
 #start calculation
 ratio <- ratio %>% mutate(Cash.Ratio = ifelse(Total.Current.Liabilities==0, NA, round(Cash..Cash.Equivalents...Short.Term.Investments/Total.Current.Liabilities,6)))
+
 
 #check result
 #2 invalid
@@ -132,6 +135,7 @@ sum(ratio$Total.Equity < 0, na.rm = T) #717
 head(ratio[ratio$Total.Equity < 0, c('Total.Assets', 'Total.Liabilities', 'Total.Equity')])
 #the original data is correct, we don't need to process the data 
 
+condition <- 
 #start calculation
 ratio <- ratio %>% mutate(Long.Term.Debt.Ratio = ifelse(((Long.Term.Debt + Total.Equity)==0) | Long.Term.Debt <0 , NA, round(Long.Term.Debt/(Long.Term.Debt + Total.Equity),6)))
 
@@ -160,7 +164,9 @@ summary(ratio$Total.Equity)
 sum(ratio$Total.Equity <0 ) #717, negative equity is red flag of the over-leveraging, keep it
 
 #start calculation
-ratio <- ratio %>% mutate(Liabilities.to.Equity.Ratio = ifelse((Total.Equity==0) | Total.Liabilities < 0, NA, round(Total.Liabilities/Total.Equity,6)))
+ratio <- ratio %>% mutate(Liabilities.to.Equity.Ratio = ifelse(Total.Equity==0 | Total.Liabilities < 0, NA, round(Total.Liabilities/Total.Equity,6)))
+
+
 
 #check result
 #26 NA
@@ -185,7 +191,8 @@ summary(ratio$Total.Assets)
 
 
 #start calculation
-ratio <- ratio %>% mutate(Total.Debt.Ratio = ifelse((Total.Assets==0) | Total.Liabilities <0, NA, round(Total.Liabilities/Total.Assets,6)))
+ratio <- ratio %>% mutate(Total.Debt.Ratio = ifelse(Total.Assets==0| Total.Liabilities <0, NA, round(Total.Liabilities/Total.Assets,6)))
+
 
 #check result
 #15 NA
@@ -213,7 +220,10 @@ summary(ratio$Total.Assets)
 
 
 #start calculation
-ratio <- ratio %>% mutate(Debt.to.Asset.Ratio = ifelse((Total.Assets==0) | Long.Term.Debt <0, NA, round((Long.Term.Debt + Short.Term.Debt)/Total.Assets,6)))
+ratio <- ratio %>% mutate(Debt.to.Asset.Ratio = ifelse((Total.Assets==0| Long.Term.Debt <0), NA, round((Long.Term.Debt + Short.Term.Debt)/Total.Assets,6)))
+
+
+
 
 #check result
 #2 NA
@@ -244,9 +254,11 @@ sum(ratio$Interest.Expense..Net < 0, na.rm = T)
 #if we have interest gain,we need to set Interest Coverage to a high value so it can pass a high interest coverage screen. We may want to use mean to fill these 
 
 #start calculation
-ratio <- ratio %>% mutate(Interest.Coverage.Ratio = ifelse((Interest.Expense..Net==0) | Interest.Expense..Net >0, NA, round(Operating.Income..Loss./(-1*Interest.Expense..Net),6)))
+ratio <- ratio %>% mutate(Interest.Coverage.Ratio = ifelse(Interest.Expense..Net>=0, NA, round(Operating.Income..Loss./(-1*Interest.Expense..Net),6)))
+#assign mean value to those with interest gain
 mean <- mean(ratio$Interest.Coverage.Ratio, na.rm=T) #50.039
 ratio$Interest.Coverage.Ratio[ratio$Interest.Expense..Net>0] <- mean
+
 
 
 #check result
@@ -478,7 +490,7 @@ sum(ratio$Cost.of.Revenue >0 , na.rm = T) #626
 ```
 
 
-Market to Book Ratio: Stcok Price(year-end) * Shares(basic)/ Total Equity 
+Book to Market Ratio: Stcok Price(year-end) * Shares(basic)/ Total Equity 
 ```{r}
 #import stock price data
 stock <- fread('simfin_data/us-shareprices-daily.csv')
@@ -583,6 +595,7 @@ dim(final)#[1] 13992    31
 dim(final_withoutmissing) #11718 31
 #we have 2297 rows with no missing values in technology sector 
 nrow(final_withoutmissing[final_withoutmissing$Sector == 'Technology',]) # 2297
+
 ```
 
 export data

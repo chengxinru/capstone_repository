@@ -1,10 +1,9 @@
 ## Clean Share Prices data, calculate stock return
 
-setwd("/Users/zhenzhenzhu/Documents/capstone/")
 library(dplyr)
 
 
-stock <- read.csv2("us-shareprices-daily.csv")
+stock <- read.csv2("simfin_data/us-shareprices-daily.csv")
 stock2 <- stock[c(1,2,3,4,7,9)] ## select relative columns
 date <- as.Date(stock2$Date)
 stock2$Year <- substring(date,1,4) ## extract Year

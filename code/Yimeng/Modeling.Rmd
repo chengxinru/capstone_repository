@@ -1,0 +1,202 @@
+---
+title: "R Notebook"
+output: html_notebook
+editor_options: 
+  chunk_output_type: inline
+---
+
+Setup
+```{r}
+library(tidyverse)
+library(DataExplorer)
+library(ggplot2)
+```
+
+Import data and leave only data in Technology Sector
+
+```{r}
+df <- read.csv("capstone_repository/data/ratios_return.csv")
+dim(df)
+colnames(df)
+tech <- subset(df, Sector == 'Technology')
+dim(tech)# 2297   32
+```
+
+Operating.Profit.Margin
+```{r}
+summary(tech$Operating.Profit.Margin)
+#     Min.   1st Qu.    Median      Mean   3rd Qu.      Max. 
+#-42.79674  -0.00435   0.07714  -0.00335   0.17252   0.63161 
+
+#check distribuion
+ggplot(tech)+ geom_histogram(aes(x=Operating.Profit.Margin)) 
+#it seems that there are a few outliers 
+#but how many are there?
+```
+
+
+```{r}
+#we believe it should be acceptable(not common though) for a company to lose more than 3 times of its revenue
+sum(tech$Operating.Profit.Margin < -3) 
+#there are only 10 such outliers and let's see how the distribution looks like after 
+ggplot(tech[tech$Operating.Profit.Margin > -3,]) + geom_histogram(aes(x = Operating.Profit.Margin))
+#we see the disribution after removing the outliers are pretty symmetric and normal
+ggplot(tech[tech$Operating.Profit.Margin > -1,]) + geom_histogram(aes(x = Operating.Profit.Margin))
+```
+
+Let's take a closer look at the 10 outlying obervations, if they have other weird column
+```{r}
+tech[tech$Operating.Profit.Margin < -3,]
+```
+
+I am suggesting taking these 2 outliers out because they have interest earnings with huge operating loss which is weird. Also they have 2 value imputed which might significantly twist the modeling result. 
+```{r}
+subset(allcol, ((Ticker == 'WATT' ) & Fiscal.Year %in% c(2017,2015)))
+```
+
+
+Return.On.Capital
+```{r}
+summary(tech$Return.On.Capital)
+#     Min.   1st Qu.    Median      Mean   3rd Qu.      Max. 
+#-284.3858    0.1088    0.3347    0.5882    0.7553   77.0345
+
+#check distribuion
+ggplot(tech)+ geom_histogram(aes(x=Return.On.Capital)) 
+#it seems that there are a few outliers 
+#but how many are there?
+```
+
+```{r}
+#find outliers
+sum(tech$Return.On.Capital < -10) #3
+sum(tech$Return.On.Capital > 20) #4
+#even after removing outliers the data is still pretty right skewed 
+ggplot(tech[tech$Return.On.Capital %between% c(-5,5),]) + geom_histogram(aes(x = Return.On.Capital))
+```
+
+Try cube transformation, and it works pretty well
+```{r}
+Math.cbrt <- function(x) {
+    sign(x) * abs(x)^(1/3)
+}
+Math.cbrt(tech$Return.On.Capital[61])
+tech$Return.On.Capital.tr <- Math.cbrt(tech$Return.On.Capital)
+ggplot(tech[tech$Return.On.Capital %between% c(-80,100),]) + geom_histogram(aes(x = Return.On.Capital.tr))
+```
+
+Take a look at the outliers being removed, they are not the same group of outliers for Operating Profit Margin
+```{r}
+tech[!tech$Return.On.Capital %between% c(-10,20),]
+out <- tech[!tech$Return.On.Capital %between% c(-10,20),c("Ticker","Fiscal.Year")]
+```
+
+the outliers all have positive after tax operating income, the problem with those extreme negative values is that some comapny have very low equity. Given that we are analyzing stock market, I am suggesting removing at least the one with ROC of -284.38581 but a very high stock return.
+```{r}
+ratio$Fiscal.Year <- as.integer(ratio$Fiscal.Year)
+ratio %>% inner_join(out)
+```
+
+Return.On.Equity
+ROE.bad.or.good
+
+```{r}
+summary(tech$Return.On.Equity)
+#    Min.   1st Qu.    Median      Mean   3rd Qu.      Max. 
+#-112.2226    0.2786    0.5781    1.3391    1.2264  964.7980 
+
+#check distribuion
+ggplot(tech)+ geom_histogram(aes(x=Return.On.Equity)) 
+#it seems that there are a few outliers 
+#but how many are there?
+```
+
+right skewed 
+```{r}
+#find outliers
+sum(tech$Return.On.Equity < -30) #6
+sum(tech$Return.On.Equity > 30) #5
+#even after removing outliers the data is still pretty right skewed 
+ggplot(tech[tech$Return.On.Equity %between% c(-30,30),]) + geom_histogram(aes(x = Return.On.Equity, fill = ROE.bad.or.good))
+```
+
+The distribution is pretty symmetric for those negative values. And most negative values are in bad state, so we can make a interaction between the indicating variable and ROE. Dropping the clumn is also possible 
+```{r}
+Math.cbrt <- function(x) {
+    sign(x) * abs(x)^(1/3)
+}
+
+tech$Return.On.Equity.tr <- Math.cbrt(tech$Return.On.Equity)
+summary(tech$Return.On.Equity.tr)
+ggplot(tech[tech$Return.On.Equity %between% c(-30,30),]) + geom_histogram(aes(x = Return.On.Equity.tr, fill=ROE.bad.or.good))
+```
+
+Receivable.Turnover
+
+```{r}
+summary(tech$Receivable.Turnover)
+#    Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
+#    0.02     5.31     6.94    34.02     9.45 37975.57 
+
+#check distribuion
+ggplot(tech)+ geom_histogram(aes(x=Receivable.Turnover)) 
+#it seems that there is a very large
+#but how many are there?
+```
+
+The distribution is very much right skewed, need transformation
+```{r}
+sum(tech$Receivable.Turnover < 0) #0
+sum(tech$Receivable.Turnover > 200) #13
+#even after removing outliers the data is still pretty right skewed 
+ggplot(tech[tech$Receivable.Turnover <200,]) + geom_histogram(aes(x = Receivable.Turnover))
+```
+
+Try log transformation, pretty symmetric
+```{r}
+tech$Receivable.Turnover.tr <- log(tech$Receivable.Turnover)
+summary(tech$Receivable.Turnover.tr)
+#   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+# -4.034   1.670   1.938   2.022   2.246  10.545 
+ggplot(tech) + geom_histogram(aes(x = Receivable.Turnover.tr))
+```
+
+Book.to.Market.Ratio
+```{r}
+summary(tech$Book.to.Market.Ratio)
+#     Min.   1st Qu.    Median      Mean   3rd Qu.      Max. 
+#  -5.9854    0.1821    0.3416    2.5822    0.6230 1326.5407 
+
+#check distribuion
+ggplot(tech)+ geom_histogram(aes(x=Book.to.Market.Ratio)) 
+#it seems that there is a very large
+#but how many are there?
+```
+
+
+Right skewed distribution
+```{r}
+sum(tech$Book.to.Market.Ratio < -10) #0
+sum(tech$Book.to.Market.Ratio > 10) 11
+#even after removing outliers the data is still pretty right skewed 
+ggplot(tech[tech$Book.to.Market.Ratio %between% c(-10,10),]) + geom_histogram(aes(x = Book.to.Market.Ratio))
+```
+
+
+
+```{r}
+tech$Book.to.Market.Ratio.tr <- Math.cbrt(tech$Book.to.Market.Ratio)
+summary(tech$Book.to.Market.Ratio.tr)
+#   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+#-1.8156  0.5668  0.6991  0.7125  0.8541 10.9877 
+sum(tech$Book.to.Market.Ratio.tr >5) #5
+ggplot(tech[tech$Book.to.Market.Ratio.tr <5,]) + geom_histogram(aes(x = Book.to.Market.Ratio.tr))
+```
+
+Check the 5 outliers, they all have very small number of outstanding shares, maybe we should drop them.
+```{r}
+out <- tech[tech$Book.to.Market.Ratio.tr >5, c('Ticker','Fiscal.Year')]
+
+allcol %>% inner_join(out)
+```
+
