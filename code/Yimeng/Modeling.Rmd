@@ -16,7 +16,7 @@ Import data and leave only data in Technology Sector
 
 ```{r}
 df <- read.csv("capstone_repository/data/ratios_return.csv")
-dim(df)
+dim(df)#10810    32
 colnames(df)
 tech <- subset(df, Sector == 'Technology')
 dim(tech)# 2297   32
