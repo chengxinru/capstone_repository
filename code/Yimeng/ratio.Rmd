@@ -28,9 +28,6 @@ Set up change id variables to character type, identify numeric columsn and categ
 names(df)
 df$SimFinId <- as.character(df$SimFinId)
 df$IndustryId <- as.character(df$IndustryId)
-ch_col <- names(df)[sapply(df, is.character)]
-num_col <- names(df)[sapply(df, is.numeric)]
-log_col <- names(df)[sapply(df, is.logical)]
 
 #create a copy for ratio calculation
 ratio <- copy(df)
@@ -135,7 +132,7 @@ sum(ratio$Total.Equity < 0, na.rm = T) #717
 head(ratio[ratio$Total.Equity < 0, c('Total.Assets', 'Total.Liabilities', 'Total.Equity')])
 #the original data is correct, we don't need to process the data 
 
-condition <- 
+
 #start calculation
 ratio <- ratio %>% mutate(Long.Term.Debt.Ratio = ifelse(((Long.Term.Debt + Total.Equity)==0) | Long.Term.Debt <0 , NA, round(Long.Term.Debt/(Long.Term.Debt + Total.Equity),6)))
 
@@ -170,8 +167,8 @@ ratio <- ratio %>% mutate(Liabilities.to.Equity.Ratio = ifelse(Total.Equity==0 |
 
 #check result
 #26 NA
-#2% zero
-#717% negative 
+#2 zero
+#717 negative 
 head(ratio[,c('Total.Equity', 'Total.Liabilities','Liabilities.to.Equity.Ratio')])
 sum(is.na(ratio$Liabilities.to.Equity.Ratio))
 sum(ratio$Liabilities.to.Equity.Ratio == 0, na.rm = T)
@@ -196,8 +193,8 @@ ratio <- ratio %>% mutate(Total.Debt.Ratio = ifelse(Total.Assets==0| Total.Liabi
 
 #check result
 #15 NA
-#2% zero
-#0% negative (mostly due to negative Total.Equity )
+#2 zero
+#0 negative (mostly due to negative Total.Equity )
 head(ratio[,c('Total.Assets', 'Total.Liabilities','Total.Debt.Ratio')])
 sum(is.na(ratio$Total.Debt.Ratio))
 sum(ratio$Total.Debt.Ratio == 0, na.rm = T)
@@ -253,16 +250,26 @@ sum(ratio$Interest.Expense..Net < 0, na.rm = T)
 #If you earned more income from interest that resulted in a positive interest gain
 #if we have interest gain,we need to set Interest Coverage to a high value so it can pass a high interest coverage screen. We may want to use mean to fill these 
 
+#总共分三种情况
+#1. positive income & interst expense（正常）
+#2. positive income & interest gain （用mean fill）
+#3. negative income & interest expense (正常)
+#4. negative income & interest earn （不好， 异常 drop）
+
+nrow(ratio[ratio$Sector == 'Technology'& ratio$Interest.Expense..Net > 0 & ratio$Operating.Income..Loss. <0, ]) #186
+
+
+
 #start calculation
 ratio <- ratio %>% mutate(Interest.Coverage.Ratio = ifelse(Interest.Expense..Net>=0, NA, round(Operating.Income..Loss./(-1*Interest.Expense..Net),6)))
 #assign mean value to those with interest gain
 mean <- mean(ratio$Interest.Coverage.Ratio, na.rm=T) #50.039
-ratio$Interest.Coverage.Ratio[ratio$Interest.Expense..Net>0] <- mean
+ratio$Interest.Coverage.Ratio[ratio$Interest.Expense..Net>0 & ratio$Operating.Income..Loss. > 0] <- mean
 
 
 
 #check result
-#61 NA
+#607 NA
 #0 zero
 #2025 negative (due to negative operating income)
 head(ratio[,c('Operating.Income..Loss.', 'Interest.Expense..Net','Interest.Coverage.Ratio')])
@@ -282,20 +289,33 @@ sum(ratio$Operating.Income..Loss. <0, na.rm = T)#2591
 summary(ratio$Depreciation...Amortization)
 #      Min.    1st Qu.     Median       Mean    3rd Qu.       Max. 
 #-1.069e+09  1.158e+07  6.977e+07  4.150e+08  2.704e+08  3.876e+10 
-sum(ratio$Depreciation...Amortization > 0, na.rm = T)#13971
-#Negative depreciation, on the other hand, accounts for the opposite process of an asset gaining value over time. There is nothing wrong
+sum(ratio$Depreciation...Amortization < 0, na.rm = T)#11
+#Negative depreciation, on the other hand, accounts for the opposite process of an asset gaining value over time. but that's not cash flow, so we make it 0 here 
+ratio$Depreciation...Amortization[ratio$Depreciation...Amortization < 0] <- 0
 
-#start calculation
+  
+
+#三种情况
+#1. 分子大于 0 & interst expense（正常）
+#2. 分子大于 0 & interest gain （用mean fill）
+#3. 分子小于 0 & interest expense (正常)
+#4. 分子小于 0 & interest gain （不好， 异常 drop）
+
+a <- ratio[ratio$Interest.Expense..Net > 0 & (ratio$Depreciation...Amortization + ratio$Operating.Income..Loss.) < 0 & ratio$Sector == 'Technology', ] # 155
+b <- ratio[ratio$Sector == 'Technology'& ratio$Interest.Expense..Net > 0 & ratio$Operating.Income..Loss. <0, ]#86
+result <- inner_join(a, b, on = c('Ticker' = 'Ticker','Fiscal.Year' = 'Fiscal.Year'))  #nrow  = 155 
+#重合度高，可以drop
+
 #start calculation
 ratio <- ratio %>% mutate(Cash.Coverage.Ratio = ifelse(Interest.Expense..Net >= 0, NA, round((Operating.Income..Loss. + Depreciation...Amortization)/(-1*Interest.Expense..Net),6)))
 mean <- mean(ratio$Cash.Coverage.Ratio, na.rm=T) #74.08185
-ratio$Cash.Coverage.Ratio[ratio$Interest.Expense..Net>0] <- mean
+ratio$Cash.Coverage.Ratio[ratio$Interest.Expense..Net>0 & (ratio$Depreciation...Amortization + ratio$Operating.Income..Loss.) > 0] <- mean
 
 
 #check result
-#61 NA
+#544 NA
 #0 zero
-#1468 negative 
+#1467 negative 
 head(ratio[,c('Operating.Income..Loss.', 'Interest.Expense..Net','Depreciation...Amortization','Cash.Coverage.Ratio')])
 sum(is.na(ratio$Cash.Coverage.Ratio))
 sum(ratio$Cash.Coverage.Ratio == 0, na.rm = T)
@@ -316,7 +336,7 @@ sum(ratio$Operating.Expenses > 0 , na.rm = T)#4, should be problem, make it NA
 summary(ratio$Depreciation...Amortization)      
 #     Min.    1st Qu.     Median       Mean    3rd Qu.       Max. 
 #-1.069e+09  1.158e+07  6.977e+07  4.150e+08  2.704e+08  3.876e+10 
-sum(ratio$Depreciation...Amortization < 0, na.rm = T) #11
+sum(ratio$Depreciation...Amortization < 0, na.rm = T) #0
 
 #start calculation
 ratio <- ratio %>% mutate(After.Tax.Operating.Income = ifelse(Operating.Expenses >0,NA,Revenue - Depreciation...Amortization + Operating.Expenses))
@@ -356,16 +376,23 @@ summary(ratio$Long.Term.Debt)
 #-3.480e+05  2.263e+08  5.630e+08  2.870e+09  2.207e+09  1.662e+11 
 sum(ratio$Long.Term.Debt < 0) #2, make it NA
 
-
 summary(ratio$Total.Equity)
 #      Min.    1st Qu.     Median       Mean    3rd Qu.       Max. 
 #-1.453e+10  1.356e+08  7.464e+08  4.045e+09  2.894e+09  3.525e+11 
 sum(ratio$Total.Equity <0 , na.rm = T)#717
 
+sum((ratio$Long.Term.Debt + ratio$Total.Equity) < 0 & ratio$Long.Term.Debt >= 0 & ratio$After.Tax.Operating.Income > 0 & ratio$Sector == 'Technology') 
+#4钟情况
+#1.分子正 & 分母正 （正常）
+#2.分子正 & 分母负 （drop）21个
+#3.分子负 & 分母正 （正常）
+#4.分子负 & 分母负 （drop）5个
+
+
 #start calculation
-ratio <- ratio %>% mutate(Return.On.Capital = ifelse(((Long.Term.Debt + Total.Equity) == 0) | Long.Term.Debt <0,NA,After.Tax.Operating.Income/(Long.Term.Debt + Total.Equity)))
-sum(is.na(ratio$Return.On.Capital)) #6
-sum(ratio$Return.On.Capital <0, na.rm=T) #1255
+ratio <- ratio %>% mutate(Return.On.Capital = ifelse(((Long.Term.Debt + Total.Equity) <= 0) | Long.Term.Debt <0,NA,After.Tax.Operating.Income/(Long.Term.Debt + Total.Equity)))
+sum(is.na(ratio$Return.On.Capital)) #118
+sum(ratio$Return.On.Capital <0, na.rm=T) #1186
 ```
 
 Return On Equity: After Tax Operating Income/Total Equity
@@ -383,14 +410,21 @@ sum(ratio$Total.Equity < 0 , na.rm = T)
 
 #having positive profits and negative stockholder equity is more indicative of a potential future rebound than having negative profits and positive stockholder equity.So we need to differentiate the two 
 
+
+sum(ratio$Total.Equity < 0 & ratio$After.Tax.Operating.Income < 0 & ratio$Sector == 'Technology') 
+#4钟情况
+#1.分子正 & 分母正 （正常）
+#2.分子正 & 分母负 （drop）86个
+#3.分子负 & 分母正 （正常）
+#4.分子负 & 分母负 （drop）24个
+
 #start calculation
 #we need to create a indicator telling whether 
-ratio <- ratio %>% mutate(Return.On.Equity = ifelse( Total.Equity == 0,NA,After.Tax.Operating.Income/Total.Equity))
-ratio <- mutate(ratio, ROE.bad.or.good = ifelse((After.Tax.Operating.Income <0) &(Total.Equity >0), 'bad', ifelse(!is.na(Return.On.Equity),'good', NA)))
-sum(is.na(ratio$Return.On.Equity)) #15
-sum(ratio$Return.On.Equity <0, na.rm=T) #1649
-sum(ratio$ROE.bad.or.good =='bad',na.rm=T) #1080
-sum(is.na(ratio$ROE.bad.or.good))#15, consistent
+ratio <- ratio %>% mutate(Return.On.Equity = ifelse( Total.Equity <= 0,NA,After.Tax.Operating.Income/Total.Equity))
+
+
+sum(is.na(ratio$Return.On.Equity)) #732
+sum(ratio$Return.On.Equity <0, na.rm=T) #1080
 ```
 
 Operating Profit Margin: Operating Income/ Revenue
@@ -439,7 +473,7 @@ Asset Turnover; Revenue/Total Asset(year-start)
 ratio <- as.data.table(ratio)
 ratio[, Total.Assets.year.start := shift(Total.Assets, 1, 'lag'), by = Ticker]
 head(ratio[,c("Ticker","Total.Assets", "Total.Assets.year.start")], 20)
-sum(is.na(ratio$Total.Assets.year.start)) # 1750%missing
+sum(is.na(ratio$Total.Assets.year.start)) # 1750 missing
 sum(ratio$Total.Assets.year.start ==0, na.rm = T) #0 zero
 #complete
 
@@ -509,7 +543,7 @@ end_price$SimFinId <- as.character(end_price$SimFinId)
 ratio <- left_join(ratio,end_price, by= c("Ticker", "SimFinId", "Fiscal.Year" = "Year"))
 sum(is.na(ratio$Close)) #777 missing, all because these comapnies are missing in stock price dataset
 
-
+head(allcol)
 #explore
 summary(ratio$Close)
 #   Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
@@ -524,11 +558,15 @@ sum(ratio$Total.Equity==0, na.rm=T)#11
 sum(ratio$Total.Equity<0) #717
 
 
-#start calculation
-ratio <- ratio %>% mutate(Market.to.Book.Ratio = ifelse(Total.Equity ==0 , NA, (Close * Shares..Diluted.)/Total.Equity))
+summary(ratio$Close)
+summary(ratio$Total.Equity)
+summary(ratio$Shares..Diluted.)
 
-sum(is.na(ratio$Market.to.Book.Ratio)) #781
-sum(ratio$Market.to.Book.Ratio <0, na.rm=T) #573
+#start calculation 
+ratio <- ratio %>% mutate(Book.to.Market.Ratio = ifelse(Close ==0 , NA, (Total.Equity/Shares..Diluted.)/Close))
+
+sum(is.na(ratio$Book.to.Market.Ratio)) #777
+sum(ratio$Book.to.Market.Ratio <0, na.rm=T) #573
 ```
 
 Earning Per Share: Net Income/ Shares
@@ -566,35 +604,19 @@ summary(ratio$Earning.Per.Share)
 ratio <- ratio %>% mutate(Price.to.Earning.Ratio = ifelse(Earning.Per.Share ==0 , NA, Close/Earning.Per.Share))
 
 sum(is.na(ratio$Price.to.Earning.Ratio)) #778
-sum(ratio$Price.to.Earning.Ratio <0, na.rm=T) #3193
+sum(ratio$Price.to.Earning.Ratio <0, na.rm=T) #3189
 ```
-
-
-Book to Market Ratio: (Total Equity/Shares)/ Stoke Price
-```{r}
-summary(ratio$Close)
-summary(ratio$Total.Equity)
-summary(ratio$Shares..Diluted.)
-
-#start calculation 
-ratio <- ratio %>% mutate(Book.to.Market.Ratio = ifelse(Close ==0 , NA, (Total.Equity/Shares..Diluted.)/Close))
-
-sum(is.na(ratio$Book.to.Market.Ratio)) #777
-sum(ratio$Book.to.Market.Ratio <0, na.rm=T) #573
-
-```
-
 
 
 select only ratio columns, and drop rows with any missing value
 ```{r}
 names(ratio)
-final <- ratio[,c(1:8,37:46, 48:53, 55, 57, 62:66)]
+final <- ratio[,c(1:8, 38:47,49:53, 55, 57, 61:65)]
 final_withoutmissing <- na.omit(final)
-dim(final)#[1] 13992    31
-dim(final_withoutmissing) #11718 31
+dim(final)#[1] 13992    30
+dim(final_withoutmissing) #10810 31
 #we have 2297 rows with no missing values in technology sector 
-nrow(final_withoutmissing[final_withoutmissing$Sector == 'Technology',]) # 2297
+nrow(final_withoutmissing[final_withoutmissing$Sector == 'Technology',]) # 2091
 
 ```
 

@@ -52,6 +52,7 @@ tech[tech$Operating.Profit.Margin < -3,]
 I am suggesting taking these 2 outliers out because they have interest earnings with huge operating loss which is weird. Also they have 2 value imputed which might significantly twist the modeling result. 
 ```{r}
 subset(allcol, ((Ticker == 'WATT' ) & Fiscal.Year %in% c(2017,2015)))
+cor(tech)
 ```
 
 

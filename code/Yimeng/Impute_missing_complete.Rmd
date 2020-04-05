@@ -15,14 +15,23 @@ library(data.table)
 
 
 Import data that includes all columns from 3 statements
-```{r}
-df <- read.csv('capstone_repository/data/df.csv')
-allcol <- read.csv('capstone_repository/data/allColumns.csv')
-```
-
 Proportion of missing value in each column 
 ```{r}
+df <- read.csv('capstone_repository/data/df.csv')
 prop_missing <- sort(round(colMeans(!is.na(df))*100,2), decreasing = T)
+```
+
+Check the proportion of missing in tech sector
+```{r}
+col <- cols <- c("Ticker","SimFinId", "Company.Name", "IndustryId","Sector", "Industry", "Report.Date","Fiscal.Year","Fiscal.Period", "Publish.Date", "Revenue", "Cost.of.Revenue", "Total.Assets","Total.Current.Assets","Total.Liabilities", "Total.Current.Liabilities", "Cash..Cash.Equivalents...Short.Term.Investments", "Accounts...Notes.Receivable", "Long.Term.Debt", "Total.Equity", "Short.Term.Debt", "Operating.Income..Loss.", "Interest.Expense..Net", "Depreciation...Amortization","Operating.Expenses", "Income.Tax..Expense..Benefit..Net", "Net.Income..Common.", "Inventories", "Shares..Diluted.", "Dividends.Paid")
+complete_tech <- na.omit(df[df$Sector == 'Technology',col])
+dim(complete_tech) #only 814 tech companies has complete data that we need 
+
+```
+
+proportion of missing in each column
+```{r}
+sort(round(colMeans(!is.na(df[df$Sector == 'Technology',col]))*100,2), decreasing = T)
 ```
 
 Operating Income
@@ -88,6 +97,11 @@ high_cor
 
 ```{r}
 #check the proporting of non-missing values in this column when the imputed col is missing
+sort(round(colMeans(!is.na(df[is.na(df$Depreciation...Amortization),]))*100,2), decreasing = T)[names(high_cor)]
+```
+
+
+```{r}
 sort(round(colMeans(!is.na(df[!is.na(df$Depreciation...Amortization),]))*100,2), decreasing = T)[names(high_cor)]
 #impute
 df <- regressionImp(Depreciation...Amortization~ Total.Assets +  Total.Liabilities...Equity + Total.Liabilities + Total.Current.Liabilities, data = df, imp_var= T)
@@ -153,7 +167,7 @@ high_cor
 #check the proporting of non-missing values in this column when the imputed col is missing
 sort(round(colMeans(!is.na(df[!is.na(df$Income.Tax..Expense..Benefit..Net),]))*100,2), decreasing = T)[names(high_cor)]
 #impute
-df <- regressionImp(Income.Tax..Expense..Benefit..Net~ Pretax.Income..Loss. + Pretax.Income..Loss...Adj. + Operating.Income..Loss. + Income..Loss..from.Continuing.Operations + Net.Income..Common. + Total.Assets, data = df, imp_var= T)
+df <- regressionImp(Income.Tax..Expense..Benefit..Net~ Pretax.Income..Loss. + Pretax.Income..Loss...Adj. + Operating.Income..Loss. + Income..Loss..from.Continuing.Operations + Net.Income..Common. + Total.Assets + Dividends.Paid, data = df, imp_var= T)
 ```
 
 
@@ -171,7 +185,7 @@ high_cor
 
 ```{r}
 #check the proporting of non-missing values in this column when the imputed col is missing
-sort(round(colMeans(!is.na(df[!is.na(df$Shares..Diluted.),]))*100,2), decreasing = T)[names(high_cor)]
+sort(round(colMeans(!is.na(df[is.na(df$Shares..Diluted.),]))*100,2), decreasing = T)[names(high_cor)]
 #impute
 df <- regressionImp(Shares..Diluted.~ Total.Assets + Total.Liabilities...Equity, data = df, imp_var= F)
 ```
@@ -207,9 +221,9 @@ high_cor
 
 ```{r}
 #check the proporting of non-missing values in this column when the imputed col is missing
-sort(round(colMeans(!is.na(df[!is.na(df$Cost.of.Revenue),]))*100,2), decreasing = T)[names(high_cor)]
+sort(round(colMeans(!is.na(df[is.na(df$Cost.of.Revenue),]))*100,2), decreasing = T)[names(high_cor)]
 #impute
-df <- regressionImp(Cost.of.Revenue ~ Revenue + Total.Current.Liabilities + Total.Liabilities + Total.Assets + Total.Liabilities...Equity + Total.Current.Assets, data = df, imp_var= T)
+df <- regressionImp(Cost.of.Revenue ~  Total.Current.Liabilities + Total.Liabilities + Total.Assets + Total.Liabilities...Equity, data = df, imp_var= T)
 ```
 
 
@@ -226,7 +240,7 @@ high_cor
 
 ```{r}
 #check the proporting of non-missing values in this column when the imputed col is missing
-sort(round(colMeans(!is.na(df[!is.na(df$Operating.Expenses),]))*100,2), decreasing = T)[names(high_cor)]
+sort(round(colMeans(!is.na(df[is.na(df$Operating.Expenses),]))*100,2), decreasing = T)[names(high_cor)]
 #impute
 df <- regressionImp(Operating.Expenses ~ Revenue + Shares..Diluted., data = df, imp_var= F)
 ```
@@ -241,11 +255,12 @@ cor <- abs(cor(subset(df[sapply(df, is.numeric)], select = -Interest.Expense..Ne
 high_cor <- head(cor[order(cor[,1],decreasing = T),],10)
 high_cor
 ```
+
 ```{r}
 #check the proporting of non-missing values in this column when the imputed col is missing
-sort(round(colMeans(!is.na(df[!is.na(df$Operating.Expenses),]))*100,2), decreasing = T)[names(high_cor)]
+sort(round(colMeans(!is.na(df[is.na(df$Interest.Expense..Net),]))*100,2), decreasing = T)[names(high_cor)]
 #impute
-df <- regressionImp(Interest.Expense..Net ~ Long.Term.Debt + Dividends.Paid + Total.Liabilities , data = df, imp_var= F)
+df <- regressionImp(Interest.Expense..Net ~ Dividends.Paid + Total.Liabilities + Operating.Expenses, data = df, imp_var= T)
 ```
 
 Cash,Cash Equivalents & Short Term Investment
@@ -270,7 +285,7 @@ high_cor
 ```
 ```{r}
 #check the proporting of non-missing values in this column when the imputed col is missing
-sort(round(colMeans(!is.na(df[!is.na(df$Accounts...Notes.Receivable),]))*100,2), decreasing = T)[names(high_cor)]
+sort(round(colMeans(!is.na(df[is.na(df$Accounts...Notes.Receivable),]))*100,2), decreasing = T)[names(high_cor)]
 #impute
 df <- regressionImp(Accounts...Notes.Receivable ~ Total.Assets + Total.Liabilities...Equity + Total.Liabilities + Total.Current.Liabilities, data = df, imp_var= T)
 ```
@@ -286,10 +301,12 @@ df$Short.Term.Debt <- replace_na(df$Short.Term.Debt, 0)
 
 ```{r}
 names(df)
-cols <- c("Ticker","SimFinId", "Company.Name", "IndustryId","Sector", "Industry", "Report.Date","Fiscal.Year","Fiscal.Period", "Publish.Date", "Revenue", "Cost.of.Revenue", "Total.Assets","Total.Current.Assets","Total.Liabilities", "Total.Current.Liabilities", "Cash..Cash.Equivalents...Short.Term.Investments", "Accounts...Notes.Receivable", "Long.Term.Debt", "Total.Equity", "Short.Term.Debt", "Operating.Income..Loss.", "Interest.Expense..Net", "Depreciation...Amortization","Operating.Expenses", "Income.Tax..Expense..Benefit..Net", "Net.Income..Common.", "Inventories", "Shares..Diluted.", "Dividends.Paid", "Depreciation...Amortization_imp", "Long.Term.Debt_imp", "Revenue_imp",                  "Income.Tax..Expense..Benefit..Net_imp",  "Cost.of.Revenue_imp", "Accounts...Notes.Receivable_imp")
+cols <- c("Ticker","SimFinId", "Company.Name", "IndustryId","Sector", "Industry", "Report.Date","Fiscal.Year","Fiscal.Period", "Publish.Date", "Revenue", "Cost.of.Revenue", "Total.Assets","Total.Current.Assets","Total.Liabilities", "Total.Current.Liabilities", "Cash..Cash.Equivalents...Short.Term.Investments", "Accounts...Notes.Receivable", "Long.Term.Debt", "Total.Equity", "Short.Term.Debt", "Operating.Income..Loss.", "Interest.Expense..Net", "Depreciation...Amortization","Operating.Expenses", "Income.Tax..Expense..Benefit..Net", "Net.Income..Common.", "Inventories", "Shares..Diluted.", "Dividends.Paid", "Depreciation...Amortization_imp", "Long.Term.Debt_imp","Revenue_imp","Interest.Expense..Net_imp","Income.Tax..Expense..Benefit..Net_imp" ,  "Cost.of.Revenue_imp", "Accounts...Notes.Receivable_imp")
 
 allcol <- df[,cols]
 colMeans(!is.na(allcol))
+
+#colnames(df)[!(colnames(df) %in% cols)]
 ```
 
 

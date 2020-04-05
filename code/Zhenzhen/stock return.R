@@ -36,6 +36,27 @@ for (i in 1:nrow(stock_return)) {
 
 stock_return <- stock_return[order(stock_return$Ticker),]
 
-write.csv(stock_return[,-4], "Stock Rerturn.csv")
+write.csv(stock_return[,-4], "capstone_repository/data/Stock Rerturn.csv")
+
+
+###############################join data############################################
+
+ratios <- read.csv('capstone_repository/data/financial_ratios.csv')
+dim(ratios) #10810    30
+
+ratios$Fiscal.Year <- as.character(ratios$Fiscal.Year)
+ratios$Ticker <- as.character(ratios$Ticker)
+stock_return$Ticker <- as.character(stock_return$Ticker)
+
+
+str(ratios[,c("Ticker", "Fiscal.Year", "SimFinId")])
+str(stock_return[,c("Ticker", "Year", "SimFinId")])
+
+ratio_return <- left_join(ratios,stock_return[,-4],by = c("Fiscal.Year" = "Year", "Ticker" = 'Ticker', "SimFinId" = 'SimFinId'))
+dim(ratio_return) #10810 31
+
+names(ratio_return)
+write.csv(stock_return[,-4], "capstone_repository/data/ratios_return.csv")
+
 
 
