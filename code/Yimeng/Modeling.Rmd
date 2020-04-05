@@ -12,16 +12,25 @@ library(DataExplorer)
 library(ggplot2)
 ```
 
-Import data and leave only data in Technology Sector
-
+Import data 
 ```{r}
 df <- read.csv("capstone_repository/data/ratios_return.csv")
 dim(df)#10810    32
 colnames(df)
-tech <- subset(df, Sector == 'Technology')
-dim(tech)# 2297   32
 ```
 
+Keeps rows in Technology Sector
+```{r}
+tech <- subset(df, Sector == 'Technology')
+dim(tech)# 2091   32
+head(tech)
+
+
+tech.adj <- subset(df.adj, Sector == 'Technology')
+dim(tech.adj)# 2089   32
+```
+
+##########################################################################
 Operating.Profit.Margin
 ```{r}
 summary(tech$Operating.Profit.Margin)
@@ -34,77 +43,110 @@ ggplot(tech)+ geom_histogram(aes(x=Operating.Profit.Margin))
 #but how many are there?
 ```
 
-
+After removing observation smaller than -1, the distribution is slightly left skewed and the correlation with stock return is low
 ```{r}
-#we believe it should be acceptable(not common though) for a company to lose more than 3 times of its revenue
-sum(tech$Operating.Profit.Margin < -3) 
-#there are only 10 such outliers and let's see how the distribution looks like after 
-ggplot(tech[tech$Operating.Profit.Margin > -3,]) + geom_histogram(aes(x = Operating.Profit.Margin))
-#we see the disribution after removing the outliers are pretty symmetric and normal
+cor(tech$Operating.Profit.Margin, tech$Return) #-0.01945389
 ggplot(tech[tech$Operating.Profit.Margin > -1,]) + geom_histogram(aes(x = Operating.Profit.Margin))
 ```
 
-Let's take a closer look at the 10 outlying obervations, if they have other weird column
+Let's try transform the data, first try cube transformation, doesn't work
 ```{r}
-tech[tech$Operating.Profit.Margin < -3,]
+#function for cube transformation
+Math.cbrt <- function(x) {
+    sign(x) * abs(x)^(1/3)
+}
+
+
+tech$Operating.Profit.Margin.cube <- Math.cbrt(tech$Operating.Profit.Margin)
+ggplot(tech) + geom_histogram(aes(x = Operating.Profit.Margin.cube)) #doesn't work
 ```
 
-I am suggesting taking these 2 outliers out because they have interest earnings with huge operating loss which is weird. Also they have 2 value imputed which might significantly twist the modeling result. 
+log transformation, doesn't improve the skewness either 
 ```{r}
-subset(allcol, ((Ticker == 'WATT' ) & Fiscal.Year %in% c(2017,2015)))
-cor(tech)
+tech$Operating.Profit.Margin.log <- Math.log(tech$Operating.Profit.Margin)
+summary(tech$Operating.Profit.Margin.log)
+ggplot(tech[tech$Operating.Profit.Margin > -1,]) + geom_histogram(aes(x = Operating.Profit.Margin.log)) #doesn't work
 ```
 
+So we will not do any transfrmation on this data but instead remove several outliers. 
+```{r}
+sd <- sd(tech$Operating.Profit.Margin) #0.4778129
+mean <- mean(tech$Operating.Profit.Margin) # 0.04479941
+ci <- c(mean - 3*sd, mean + 3*sd) #-1.388639  1.478238
+sum(!tech$Operating.Profit.Margin %between% ci)#15 outliers
+
+#get the id of these outliers
+Operating.Profit.Margin.outid <- tech[!tech$Operating.Profit.Margin %between% ci, c('Ticker', 'Fiscal.Year')]
+```
+
+
+
+#############################################################################
 
 Return.On.Capital
 ```{r}
 summary(tech$Return.On.Capital)
-#     Min.   1st Qu.    Median      Mean   3rd Qu.      Max. 
-#-284.3858    0.1088    0.3347    0.5882    0.7553   77.0345
+#   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+#-6.2459  0.1449  0.3547  0.6844  0.7674 40.5840 
 
 #check distribuion
 ggplot(tech)+ geom_histogram(aes(x=Return.On.Capital)) 
 #it seems that there are a few outliers 
 #but how many are there?
+
+cor(tech$Return.On.Capital,tech$Return) #-0.01206171
 ```
 
+
+After removing 29 outliers, the distribution is still pretty right skewed
 ```{r}
 #find outliers
-sum(tech$Return.On.Capital < -10) #3
-sum(tech$Return.On.Capital > 20) #4
+sd <- sd(tech$Return.On.Capital) #1.492936
+mean <- mean(tech$Return.On.Capital) # 0.6843845
+ci <- c(mean - 3*sd, mean + 3*sd) #-3.794422  5.163191
+sum(!tech$Return.On.Capital %between% ci)#29 outliers
+
+
 #even after removing outliers the data is still pretty right skewed 
-ggplot(tech[tech$Return.On.Capital %between% c(-5,5),]) + geom_histogram(aes(x = Return.On.Capital))
+ggplot(tech[tech$Return.On.Capital %between% ci,]) + geom_histogram(aes(x = Return.On.Capital))
 ```
 
-Try cube transformation, and it works pretty well
+Try cube transformation
+still has 35 outliers after transformation in terms of standard deviation
+The correlaition is improved but still minor
+but the distribution looks pretty good, so we are not removing any outliers
 ```{r}
-Math.cbrt <- function(x) {
-    sign(x) * abs(x)^(1/3)
-}
-Math.cbrt(tech$Return.On.Capital[61])
-tech$Return.On.Capital.tr <- Math.cbrt(tech$Return.On.Capital)
-ggplot(tech[tech$Return.On.Capital %between% c(-80,100),]) + geom_histogram(aes(x = Return.On.Capital.tr))
+tech$Return.On.Capital.cube <- Math.cbrt(tech$Return.On.Capital)
+
+cor(tech$Return.On.Capital.cube, tech$Return) #-0.04938463 
+
+sd_cube <- sd(tech$Return.On.Capital.cube)
+mean <- mean(tech$Return.On.Capital.cube)
+ci <- c(mean - 3*sd_cube, mean + 3* sd_cube)
+sum(!tech$Return.On.Capital.cube %between% ci) #still has 35 outliers 
+
+#plot distribution
+ggplot(tech) + geom_histogram(aes(x = Return.On.Capital.cube))
 ```
 
-Take a look at the outliers being removed, they are not the same group of outliers for Operating Profit Margin
+log transformation doesn't help
 ```{r}
-tech[!tech$Return.On.Capital %between% c(-10,20),]
-out <- tech[!tech$Return.On.Capital %between% c(-10,20),c("Ticker","Fiscal.Year")]
+tech$Return.On.Capital.log <- Math.log(tech$Return.On.Capital)
+ggplot(tech) + geom_histogram(aes(x = Return.On.Capital.log))
 ```
 
-the outliers all have positive after tax operating income, the problem with those extreme negative values is that some comapny have very low equity. Given that we are analyzing stock market, I am suggesting removing at least the one with ROC of -284.38581 but a very high stock return.
-```{r}
-ratio$Fiscal.Year <- as.integer(ratio$Fiscal.Year)
-ratio %>% inner_join(out)
-```
 
+
+
+
+######################################################################
 Return.On.Equity
-ROE.bad.or.good
-
 ```{r}
 summary(tech$Return.On.Equity)
-#    Min.   1st Qu.    Median      Mean   3rd Qu.      Max. 
-#-112.2226    0.2786    0.5781    1.3391    1.2264  964.7980 
+#    Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
+#-10.9390   0.3338   0.6366   1.7241   1.2909 964.7980 
+
+cor(tech$Return.On.Equity, tech$Return) #-0.001948035
 
 #check distribuion
 ggplot(tech)+ geom_histogram(aes(x=Return.On.Equity)) 
@@ -112,61 +154,139 @@ ggplot(tech)+ geom_histogram(aes(x=Return.On.Equity))
 #but how many are there?
 ```
 
-right skewed 
+
+There is one very big outlier, remove it because it is way beyond the range.
+51 observations are beyond 3 sd from the mean
+after removing these outliers, the distribution is still right skewed. 
 ```{r}
+tech$Return.On.Equity[tech$Return.On.Equity > 30] #54.64788  48.33061  41.95200 964.79796
+
+
+
 #find outliers
-sum(tech$Return.On.Equity < -30) #6
-sum(tech$Return.On.Equity > 30) #5
+sd <- sd(tech$Return.On.Equity[tech$Return.On.Equity < 30]) #2.007913
+mean <- mean(tech$Return.On.Equity[tech$Return.On.Equity < 30]) #1.195676
+ci <- c(mean - 3*sd, mean + 3*sd) #-4.828064  7.219416
+sum(!tech$Return.On.Equity %between% ci)#51 outliers
+
+
 #even after removing outliers the data is still pretty right skewed 
-ggplot(tech[tech$Return.On.Equity %between% c(-30,30),]) + geom_histogram(aes(x = Return.On.Equity, fill = ROE.bad.or.good))
+ggplot(tech[tech$Return.On.Equity %between% ci,]) + geom_histogram(aes(x = Return.On.Equity))
+
 ```
 
-The distribution is pretty symmetric for those negative values. And most negative values are in bad state, so we can make a interaction between the indicating variable and ROE. Dropping the clumn is also possible 
+
+Cube transformation helps, although we still have 254 observations outside 3 sd
+We need to remove one giant outlier, the ticker and year is given below
+
 ```{r}
-Math.cbrt <- function(x) {
-    sign(x) * abs(x)^(1/3)
-}
+tech$Return.On.Equity.cube <- Math.cbrt(tech$Return.On.Equity)
 
-tech$Return.On.Equity.tr <- Math.cbrt(tech$Return.On.Equity)
-summary(tech$Return.On.Equity.tr)
-ggplot(tech[tech$Return.On.Equity %between% c(-30,30),]) + geom_histogram(aes(x = Return.On.Equity.tr, fill=ROE.bad.or.good))
+
+#find outliers
+sd <- sd(tech$Return.On.Equity.cube) #0.5669262
+mean <- mean(tech$Return.On.Equity.cube) #0.87069
+ci <- c(mean - 3*sd, mean + 3*sd) #-0.8300888  2.5714687
+sum(!tech$Return.On.Equity %between% ci)#254 outliers
+
+
+summary(tech$Return.On.Equity.cube)
+#   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+#-2.2199  0.6937  0.8603  0.8707  1.0889  9.8813 
+   
+   
+ggplot(tech[tech$Return.On.Equity.cube < 8,]) + geom_histogram(aes(x = Return.On.Equity.cube))
 ```
 
-Receivable.Turnover
+log doesn't work as good as cube 
+```{r}
+tech$Return.On.Equity.log <- Math.log(tech$Return.On.Equity)
 
+   
+ggplot(tech) + geom_histogram(aes(x = Return.On.Equity.log))
+```
+
+
+
+```{r}
+#get the id of these outliers
+Return.on.Equity.out <- tech[tech$Return.On.Equity.cube > 8,c('Ticker', 'Fiscal.Year')]
+```
+
+
+
+
+#########################################################################################
+Receivable.Turnover
+there is outliers, not very high correlation. 
 ```{r}
 summary(tech$Receivable.Turnover)
-#    Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
-#    0.02     5.31     6.94    34.02     9.45 37975.57 
+#Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
+#0.21     5.45     7.00    30.74     9.39 37975.57
 
 #check distribuion
 ggplot(tech)+ geom_histogram(aes(x=Receivable.Turnover)) 
 #it seems that there is a very large
 #but how many are there?
+
+cor(tech$Receivable.Turnover, tech$Return) #-0.001375046
 ```
 
-The distribution is very much right skewed, need transformation
+
+
+The distribution is very right skewed, and there are three very huge outliers
 ```{r}
-sum(tech$Receivable.Turnover < 0) #0
-sum(tech$Receivable.Turnover > 200) #13
+sum(tech$Receivable.Turnover > 300) #9
+
+
 #even after removing outliers the data is still pretty right skewed 
-ggplot(tech[tech$Receivable.Turnover <200,]) + geom_histogram(aes(x = Receivable.Turnover))
+ggplot(tech[tech$Return.On.Equity %between% ci,]) + geom_histogram(aes(x = Return.On.Equity))
 ```
 
-Try log transformation, pretty symmetric
+Try cube transformation, still right skewed, doesn't work well
 ```{r}
-tech$Receivable.Turnover.tr <- log(tech$Receivable.Turnover)
-summary(tech$Receivable.Turnover.tr)
+tech$Receivable.Turnover.cube <- Math.cbrt(tech$Receivable.Turnover)
+summary(tech$Receivable.Turnover.cube)
 #   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-# -4.034   1.670   1.938   2.022   2.246  10.545 
-ggplot(tech) + geom_histogram(aes(x = Receivable.Turnover.tr))
+# 0.5901  1.7595  1.9125  2.0384  2.1094 33.6125  
+ggplot(tech[tech$Receivable.Turnover < 300,]) + geom_histogram(aes(x = Receivable.Turnover.cube))
 ```
+
+
+Try log transformation, pretty symmetric after removing 9 observations larger than 300
+```{r}
+tech$Receivable.Turnover.log <- log(tech$Receivable.Turnover)
+summary(tech$Receivable.Turnover.log)
+#   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+# -1.582   1.695   1.945   2.032   2.239  10.545 
+
+
+
+#find outliers
+length(tech$Receivable.Turnover.log[tech$Receivable.Turnover.log > 5]) #11
+sd <- sd(tech$Receivable.Turnover.log[tech$Receivable.Turnover.log < 5]) # 0.5928083
+mean <- mean(tech$Receivable.Turnover.log[tech$Receivable.Turnover.log < 5]) #2.008366
+ci <- c(mean - 3*sd, mean + 3*sd) #0.229941 3.786791
+sum(!tech$Receivable.Turnover.log %between% ci)#60 outliers
+
+
+#but the distribution looks pretty after only removing 9 observations
+ggplot(tech[tech$Receivable.Turnover < 300,]) + geom_histogram(aes(x = Receivable.Turnover.log))
+```
+
+get the key for outliers 
+```{r}
+Receivable.Turnover.out <- tech[tech$Receivable.Turnover > 300,c('Ticker', 'Fiscal.Year')]
+```
+
+
+
 
 Book.to.Market.Ratio
 ```{r}
 summary(tech$Book.to.Market.Ratio)
 #     Min.   1st Qu.    Median      Mean   3rd Qu.      Max. 
-#  -5.9854    0.1821    0.3416    2.5822    0.6230 1326.5407 
+#   0.0042    0.1959    0.3429    2.8065    0.6150 1326.5407 
 
 #check distribuion
 ggplot(tech)+ geom_histogram(aes(x=Book.to.Market.Ratio)) 
@@ -177,27 +297,46 @@ ggplot(tech)+ geom_histogram(aes(x=Book.to.Market.Ratio))
 
 Right skewed distribution
 ```{r}
-sum(tech$Book.to.Market.Ratio < -10) #0
-sum(tech$Book.to.Market.Ratio > 10) 11
-#even after removing outliers the data is still pretty right skewed 
-ggplot(tech[tech$Book.to.Market.Ratio %between% c(-10,10),]) + geom_histogram(aes(x = Book.to.Market.Ratio))
+#the first histogram shows to be pretty rights skewed, so we set a arbitrary cut off at 10
+sum(tech$Book.to.Market.Ratio > 10) #11
+
+#even after removing observations > 10 the data is still pretty right skewed 
+ggplot(tech[tech$Book.to.Market.Ratio <10,]) + geom_histogram(aes(x = Book.to.Market.Ratio))
 ```
 
 
-
+Try cube transformation
+After removing 11 observations larger than 10, the distribution is pretty symmetric 
 ```{r}
-tech$Book.to.Market.Ratio.tr <- Math.cbrt(tech$Book.to.Market.Ratio)
-summary(tech$Book.to.Market.Ratio.tr)
+tech$Book.to.Market.Ratio.cube <- Math.cbrt(tech$Book.to.Market.Ratio)
+ggplot(tech) + geom_histogram(aes(x = Book.to.Market.Ratio.cube))
+
+
+summary(tech$Book.to.Market.Ratio.cube)
 #   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#-1.8156  0.5668  0.6991  0.7125  0.8541 10.9877 
-sum(tech$Book.to.Market.Ratio.tr >5) #5
-ggplot(tech[tech$Book.to.Market.Ratio.tr <5,]) + geom_histogram(aes(x = Book.to.Market.Ratio.tr))
+# 0.1611  0.5808  0.6999  0.7470  0.8504 10.9877 
+sum(tech$Book.to.Market.Ratio.cube >2) #11
+
+
+ggplot(tech[tech$Book.to.Market.Ratio < 10,]) + geom_histogram(aes(x = Book.to.Market.Ratio.cube))
 ```
 
-Check the 5 outliers, they all have very small number of outstanding shares, maybe we should drop them.
+
+
+Try log transformation, works better, with wider range
 ```{r}
-out <- tech[tech$Book.to.Market.Ratio.tr >5, c('Ticker','Fiscal.Year')]
+tech$Book.to.Market.Ratio.log <- Math.log(tech$Book.to.Market.Ratio)
+ggplot(tech) + geom_histogram(aes(x = Book.to.Market.Ratio.log))
 
-allcol %>% inner_join(out)
+
+sd <- sd(tech$Book.to.Market.Ratio.log) # 0.762692
+mean <- mean(tech$Book.to.Market.Ratio.log) #-0.7379935
+ci <- c(mean - 3*sd, mean + 3*sd) #-3.026069  1.550082
+sum(!tech$Book.to.Market.Ratio.log %between% ci)#14 outliers
+
+
+ggplot(tech[tech$Book.to.Market.Ratio %between% ci,]) + geom_histogram(aes(x = Book.to.Market.Ratio.log))
 ```
+
+
 

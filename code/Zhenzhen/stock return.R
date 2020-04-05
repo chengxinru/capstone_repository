@@ -44,19 +44,39 @@ write.csv(stock_return[,-4], "capstone_repository/data/Stock Rerturn.csv")
 ratios <- read.csv('capstone_repository/data/financial_ratios.csv')
 dim(ratios) #10810    30
 
-ratios$Fiscal.Year <- as.character(ratios$Fiscal.Year)
+
+
+ratios$Fiscal.Year <- as.integer(ratios$Fiscal.Year)
 ratios$Ticker <- as.character(ratios$Ticker)
+stock_return$Year <- as.integer(stock_return$Year)
 stock_return$Ticker <- as.character(stock_return$Ticker)
+stock_return$Year.adj <- as.integer(stock_return$Year - 1)
 
 
 str(ratios[,c("Ticker", "Fiscal.Year", "SimFinId")])
-str(stock_return[,c("Ticker", "Year", "SimFinId")])
+str(stock_return[,c("Ticker", "Year", "SimFinId", "Year.adj")])
 
-ratio_return <- left_join(ratios,stock_return[,-4],by = c("Fiscal.Year" = "Year", "Ticker" = 'Ticker', "SimFinId" = 'SimFinId'))
-dim(ratio_return) #10810 31
+
+
+dim(stock_return)#22228     6
+dim(na.omit(stock_return)) #21874     6
+
+
+
+ratio_return.adj <-  left_join(ratios,na.omit(stock_return[,-4]),by = c("Fiscal.Year" = "Year.adj", "Ticker" = 'Ticker', "SimFinId" = 'SimFinId'))
+dim(ratio_return.adj) #10810    32
+dim(na.omit(ratio_return.adj)) # 10791    32
+ratio_return.adj <- na.omit(ratio_return.adj)
+
+
+ratio_return <- left_join(ratios,na.omit(stock_return[,-c(4,5)]),by = c("Fiscal.Year" = "Year", "Ticker" = 'Ticker', "SimFinId" = 'SimFinId'))
+dim(ratio_return) #10810 32
+dim(na.omit(ratio_return)) #10810    32
 
 names(ratio_return)
-write.csv(stock_return[,-4], "capstone_repository/data/ratios_return.csv")
+write.csv(ratio_return, "capstone_repository/data/ratios_return.csv")
+write.csv(ratio_return.adj, "capstone_repository/data/ratios_return_adj.csv")
 
+#############################try another way to join stock return########################
 
 
