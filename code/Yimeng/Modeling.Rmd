@@ -15,69 +15,89 @@ library(ggplot2)
 Import data 
 ```{r}
 df <- read.csv("capstone_repository/data/ratios_return.csv")
-dim(df)#10810    32
+dim(df)#10788    35
 colnames(df)
 ```
 
 Keeps rows in Technology Sector
 ```{r}
 tech <- subset(df, Sector == 'Technology')
-dim(tech)# 2091   32
-head(tech)
-
-
-tech.adj <- subset(df.adj, Sector == 'Technology')
-dim(tech.adj)# 2089   32
+dim(tech)# 2085   35
 ```
 
-##########################################################################
-Operating.Profit.Margin
+
+
+
+
+
+#####################################################################Operating.Profit.Margin###############################################
+
+Outliers on the left side 
 ```{r}
 summary(tech$Operating.Profit.Margin)
 #     Min.   1st Qu.    Median      Mean   3rd Qu.      Max. 
-#-42.79674  -0.00435   0.07714  -0.00335   0.17252   0.63161 
+#-12.07678   0.01599   0.08713   0.04513   0.17861   0.62948 
 
 #check distribuion
 ggplot(tech)+ geom_histogram(aes(x=Operating.Profit.Margin)) 
-#it seems that there are a few outliers 
-#but how many are there?
 ```
 
-After removing observation smaller than -1, the distribution is slightly left skewed and the correlation with stock return is low
+
+After removing observation smaller than -1, the distribution is slightly left skewed
+most observations are around 0
+we may want to try some transformations
 ```{r}
-cor(tech$Operating.Profit.Margin, tech$Return) #-0.01945389
+#arbitrily choose a subset 
+OPM.sub <- tech$Operating.Profit.Margin[tech$Operating.Profit.Margin >-1]
+
 ggplot(tech[tech$Operating.Profit.Margin > -1,]) + geom_histogram(aes(x = Operating.Profit.Margin))
 ```
 
-Let's try transform the data, first try cube transformation, doesn't work
+
+
+Cube transformation doesn't work
 ```{r}
 #function for cube transformation
 Math.cbrt <- function(x) {
     sign(x) * abs(x)^(1/3)
 }
 
-
 tech$Operating.Profit.Margin.cube <- Math.cbrt(tech$Operating.Profit.Margin)
-ggplot(tech) + geom_histogram(aes(x = Operating.Profit.Margin.cube)) #doesn't work
+ggplot(tech[tech$Operating.Profit.Margin > -1,]) + geom_histogram(aes(x = Operating.Profit.Margin.cube)) #doesn't work
 ```
 
-log transformation, doesn't improve the skewness either 
+
+
+
+
+log transformation, doesn't help either 
 ```{r}
+Math.log <- function(x){
+  min_x <- min(x)
+  log(x + abs(min_x) + 0.1)
+}
+
+
 tech$Operating.Profit.Margin.log <- Math.log(tech$Operating.Profit.Margin)
 summary(tech$Operating.Profit.Margin.log)
 ggplot(tech[tech$Operating.Profit.Margin > -1,]) + geom_histogram(aes(x = Operating.Profit.Margin.log)) #doesn't work
 ```
 
+
 So we will not do any transfrmation on this data but instead remove several outliers. 
 ```{r}
-sd <- sd(tech$Operating.Profit.Margin) #0.4778129
-mean <- mean(tech$Operating.Profit.Margin) # 0.04479941
-ci <- c(mean - 3*sd, mean + 3*sd) #-1.388639  1.478238
+sd <- sd(tech$Operating.Profit.Margin) #0.4783343
+mean <- mean(tech$Operating.Profit.Margin) # 0.04513398
+ci <- c(mean - 3*sd, mean + 3*sd) #-1.389869  1.480137
 sum(!tech$Operating.Profit.Margin %between% ci)#15 outliers
 
 #get the id of these outliers
 Operating.Profit.Margin.outid <- tech[!tech$Operating.Profit.Margin %between% ci, c('Ticker', 'Fiscal.Year')]
 ```
+
+
+
+
 
 
 
