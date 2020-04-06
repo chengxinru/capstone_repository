@@ -1,8 +1,12 @@
 df<- read.csv('/Users/xinrucheng/Desktop/capstone/capstone_repository/data/ratios_return.csv')
 unique(df['Sector'])
 tech=df[df['Sector']=='Technology',]
-nrow(tech)/nrow(df) # %19.2%data
-
+nrow(tech)/nrow(df) # %19.34%data
+tech$Fiscal.Year
+myvars <- c('Ticker_x','SimFinId','Report.Date','Fiscal.Year',
+            "Current.Ratio", "Quick.Ratio", "Total.Debt.Ratio",'Debt.to.Asset.Ratio',
+            'Cash.Coverage.Ratio','Interest.Coverage.Ratio')
+tech_sub <- tech[myvars]
 #-----------------------------current ratio----------------------------------------
 cr<-df['Current.Ratio']
 cr_tech<-tech['Current.Ratio']
@@ -19,6 +23,9 @@ plot(d2)
 d3 <- density(log(tech$Current.Ratio)) # returns the density data
 plot(d3) #while only using tech data --> can have better distribution
 # log transformation!
+
+tech_sub['Current.Ratio.T']<-log (tech_sub['Current.Ratio'])
+
 
 #----------------------------#Quick.Ratio--------------------------
 qr<-df['Quick.Ratio']
@@ -38,7 +45,7 @@ plot(d4) #while only using log tech data -->normal dist, shorter tail
 
 
 # log transformation!
-
+tech_sub['Quick.Ratio.T']<-log (tech_sub['Quick.Ratio'])
 #-----------------------Total.Debt.Ratio------------------
 td<-df['Total.Debt.Ratio']
 td_tech<-tech['Total.Debt.Ratio']
@@ -61,14 +68,18 @@ plot(d3) #while only using tech data --> right skewed, shorter tail
 #plot(d4) #while only using log tech data -->normal dist, shorter tail
 
 # original data is already normal, no need to do any additiona transformation
-
+tech_sub['Total.Debt.Ratio.T']<-log (tech_sub['Total.Debt.Ratio']) 
+#they are the same
 #-----------------------Debt.to.Asset.Ratio--------------------
 da<-df['Debt.to.Asset.Ratio']
 td_tech<-tech['Debt.to.Asset.Ratio']
 tech[order(tech$Debt.to.Asset.Ratio,decreasing = TRUE),]['Debt.to.Asset.Ratio']
 eliminated_pre<-subset(tech, tech$Debt.to.Asset.Ratio<100)
 deleted_companies<-subset(tech, tech$Debt.to.Asset.Ratio>100) 
+index <- tech_sub$Debt.to.Asset.Ratio >100
 #Delete Mark -2011-12/31/11
+tech_sub$Debt.to.Asset.Ratio.T[index]<-NA
+tech_sub[tech_sub$SimFinId==652365 & tech_sub$Fiscal.Year==2011,]
 tech[order(tech$Debt.to.Asset.Ratio),]['Debt.to.Asset.Ratio']
 eliminated<-subset(eliminated_pre, eliminated_pre$Debt.to.Asset.Ratio!=0)
 deleted_companies2<-subset(tech, eliminated_pre$Debt.to.Asset.Ratio==0) 
@@ -82,34 +93,41 @@ plot(d3) #while only using tech data --> right skewed, shorter tail
 d4 <- density(log(eliminated$Debt.to.Asset.Ratio)) # returns the density data
 plot(d4) #while only using log tech data -->normal dist, shorter tail
 
-
-
+index <- tech_sub$Debt.to.Asset.Ratio >100 | tech_sub$Debt.to.Asset.Ratio ==0
+tech_sub$Debt.to.Asset.Ratio.T<-log(tech_sub$Debt.to.Asset.Ratio)
+tech_sub$Debt.to.Asset.Ratio.T[index]<-NA
+tech_sub[tech_sub$SimFinId==111052 & tech_sub$Fiscal.Year==2012,] 
+# check whether it has been transfomred to na
 
 
 # after deleted 45 companies (Debt.to.Asset.Ratio=0 / >100), do log transformation !
 
 #-----------------------Cash.Coverage.Ratio---------------
 tech[order(tech$Cash.Coverage.Ratio,decreasing = TRUE),]['Cash.Coverage.Ratio']
-#boxplot(tech$Cash.Coverage.Ratio, data=tech)
-eliminated<-subset(tech, tech$Cash.Coverage.Ratio<5000) 
-deleted_companies2<-subset(tech, tech$Cash.Coverage.Ratio>5000) 
+tech[order(tech$Cash.Coverage.Ratio),]['Cash.Coverage.Ratio']
+eliminated<-subset(tech, tech$Cash.Coverage.Ratio<5000 &tech$Cash.Coverage.Ratio>-1000) 
+deleted_companies2<-subset(tech, tech$Cash.Coverage.Ratio>5000|tech$Cash.Coverage.Ratio<-1000) 
 #delete four companies with the highest cash coverage ratio - 
 #FSLR (124817.167),IPGP（220683.000),KE (29722.000), LOGM(4265.765)
 # add the absolute value of min 
-tech$Cash.Coverage.Ratio_N<-tech$Cash.Coverage.Ratio+abs(min(tech$Cash.Coverage.Ratio))+1
-Cash.Coverage.Ratio_N_E<-eliminated$Cash.Coverage.Ratio+abs(eliminated$Cash.Coverage.Ratio)+1
-d4 <- density(log(tech$Cash.Coverage.Ratio_N))
-plot(d4) #heavy tail
+Cash.Coverage.Ratio_N_E<-eliminated$Cash.Coverage.Ratio+abs(min(eliminated$Cash.Coverage.Ratio))+1
 d5 <- density(log(Cash.Coverage.Ratio_N_E)) 
 plot(d5) 
+#plot(density(Cash.Coverage.Ratio_N_E))
 #does not follow normal distribution, not required for linear regression 
 #range is 0~9.19, acceptable 
 #it is ok to transform data that are orignal negative to positive, becasue negative data simply means
 #that certain company has low cash coverage ratio, its operation income cannot cover the interest expense 
 
-#the deleted rows are stored as deleted_companies2 
 #delete FSLR-12/31/10, IPGP-12/31/13 ,KE-6/30/16, LOGM-12/31/17 (Cash.Coverage.Ratio>5000)
 #then do log transofrmation on all other data
+
+index <- (tech$Cash.Coverage.Ratio>5000)|(tech$Cash.Coverage.Ratio<(-1000))
+eliminated<-subset(tech_sub, tech_sub$Cash.Coverage.Ratio<5000 &tech_sub$Cash.Coverage.Ratio>-1000) 
+#Cash.Coverage.Ratio_N_E<-tech_sub$Cash.Coverage.Ratio+abs(min(eliminated$Cash.Coverage.Ratio))+1
+tech_sub$Cash.Coverage.Ratio.T<-log(tech_sub$Cash.Coverage.Ratio+abs(min(eliminated$Cash.Coverage.Ratio))+1)
+tech_sub$Cash.Coverage.Ratio.T[index]<-NA
+#sum(is.na(tech_sub$Cash.Coverage.Ratio.T))
 
 
 #-----------------------Interest.Coverage.Ratio--------------------------
@@ -129,3 +147,8 @@ plot(d5)
 #the deleted rows are stored as deleted_companies2 
 #delete FSLR-12/31/10, IPGP-12/31/13 ,KE-6/30/16, LOGM-12/31/17 (Cash.Coverage.Ratio>5000)
 #then do log transofrmation on all other data
+
+tech_sub$Interest.Coverage.Ratio.T<-log(tech_sub$Interest.Coverage.Ratio+abs(min(eliminated$Interest.Coverage.Ratio))+1)
+tech_sub$Interest.Coverage.Ratio.T[index]<-NA
+tech_sub
+write.csv(tech_sub, "/Users/xinrucheng/Desktop/capstone/capstone_repository/data/ratios_transformed.csv")
