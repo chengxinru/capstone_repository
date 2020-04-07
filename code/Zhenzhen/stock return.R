@@ -112,8 +112,10 @@ for (i in 1:nrow(stock_return)) {
 }
 
 
+head(stock_return)
+stock_return <- stock_return[c("Ticker","Year", "SimFinId", "Return", "Return2", "Return3", "Return4", )]
 
-
+write.csv(stock_return, "capstone_repository/data/stock_return.csv")
 
 ###############################join data############################################
 
@@ -178,3 +180,4 @@ first_last[first_last$Ticker == "ARA" & first_last$Year == "2016",]
 # <fct>     <int> <chr>    <dbl> <dbl>    <dbl> <chr> <chr>
 #   1 ARA       84598 20160104  0.01  0.01        0 2016  0104 
 # 2 ARA       84598 20161230 21.3  21.3         0 2016  1230 
+
