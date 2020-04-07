@@ -11,6 +11,8 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 library(MASS)
+library(tidyverse)
+library(data.table)
 #df <- fread("allcol.csv", drop = 1)
 #stock <- read.csv2("us-shareprices-daily.csv")
 ratio_return <- read.csv("ratios_return.csv", header = T) ## 11718 * 32
@@ -29,13 +31,26 @@ plot(tech$Return.On.Assets)
 plot(density(tech$Return.On.Assets))
 ## translate (add minimum negative value), then log transform
 log_roa <- log(tech$Return.On.Assets+1+abs(min(tech$Return.On.Assets)))
+tech$Return.On.Assets.t <- log_roa
 plot(log_roa)
-plot(density(log_roa))
+plot(density(log_roa)) ## still left-skewed
 plot(density(tech$Return.On.Assets^1/3))
 
 ## outliers:
 tech[log_roa<1, c("Ticker", "Fiscal.Year")]
-# log_roa[which(log_roa<1)] ## 0.7893779 0.0000000 0.7815722
+# log_roa[which(log_roa<1)] ## 0.7893779 0.0000000 0.7815722 1.2369020 1.2719327
+# plot(density(log_roa[log_roa>=1]))
+
+### outliers lying >3*SD away of mean
+sd <- sd(tech$Return.On.Assets) 
+mean <- mean(tech$Return.On.Assets) 
+ci <- c(mean - 3*sd, mean + 3*sd) 
+#sum(!tech$Return.On.Assets %between% ci)#45 outliers
+tech[!tech$Return.On.Assets %between% ci, c('Ticker', 'Fiscal.Year')] ##outliers
+tech$Return.On.Assets.out <- "False"
+tech$Return.On.Assets.out[which(!tech$Return.On.Assets %between% ci)] <- "True"
+plot(density(tech$Return.On.Assets.t[tech$Return.On.Assets.out=="False"]))
+
 
 ## correlation with Stock Return
 cor(log_roa, tech$Return)
@@ -68,12 +83,29 @@ plot(density(tech$Earning.Per.Share)) ## severely right-skewed
 
 ## transformamtion
 log_eps <- log(tech$Earning.Per.Share+1+abs(min(tech$Earning.Per.Share)))
+tech$Earning.Per.Share.t <- log_eps
 plot(log_eps)
 plot(density(log_eps))
 plot(density(tech$Earning.Per.Share^1/3))
 
 ## outliers
 tech[(log_eps<1) | (log_eps>5), c("Ticker", "Fiscal.Year")]
+plot(density(log_eps[log_eps<=5 & log_eps>=1]))
+tech$Earning.Per.Share.out <- "False"
+tech$Earning.Per.Share.out[which(log_eps<1) | (log_eps>5)] <- "True"
+
+### Note: The ">3*SD" rule doesn't work because the points within the 3*SD are still left skewed,
+### hence, remove points where log transformed values are <1 or >5
+
+sd <- sd(tech$Earning.Per.Share) 
+mean <- mean(tech$Earning.Per.Share) 
+ci <- c(mean - 3*sd, mean + 3*sd) 
+#sum(!tech$Earning.Per.Share %between% ci)# 4 outliers
+tech[!tech$Earning.Per.Share %between% ci, c('Ticker', 'Fiscal.Year')] ##outliers
+tech$Earning.Per.Share.out <- "False"
+tech$Earning.Per.Share.out[which(!tech$Earning.Per.Share %between% ci)] <- "True"
+plot(density(tech$Earning.Per.Share.t[tech$Earning.Per.Share.out=="False"])) ## still left skewed
+
 
 cor(log_eps, tech$Return)
 cor(log_eps, tech$Return2)
@@ -104,12 +136,24 @@ plot(density(tech$Sales.Per.Share))
 
 ## transformamtion
 log_sps <- log(tech$Sales.Per.Share)
+tech$Sales.Per.Share.t <- log_sps
 plot(log_sps)
 plot(density(log_sps))
 
 ## outliers
 fiveLargest <- tail(order(tech$Sales.Per.Share), 5) ## indice for the five highest sales per share
 tech[fiveLargest, c("Ticker", "Fiscal.Year")]
+
+### outliers lying >3*SD away of mean
+sd <- sd(tech$Sales.Per.Share) 
+mean <- mean(tech$Sales.Per.Share) 
+ci <- c(mean - 3*sd, mean + 3*sd)
+#sum(!tech$Sales.Per.Share %between% ci)#4 outliers
+tech[!tech$Sales.Per.Share %between% ci, c('Ticker', 'Fiscal.Year')] ##outliers
+tech$Sales.Per.Share.out <- "False"
+tech$Sales.Per.Share.out[which(!tech$Sales.Per.Share %between% ci)] <- "True"
+plot(density(tech$Sales.Per.Share.t[tech$Sales.Per.Share.out=="False"]))
+
 
 cor(log_sps, tech$Return)
 cor(log_sps, tech$Return2)
@@ -143,6 +187,7 @@ plot(density(tech$Price.to.Earning.Ratio))
 
 ## transformamtion
 log_per <- log(tech$Price.to.Earning.Ratio+1+abs(min(tech$Price.to.Earning.Ratio)))
+tech$Price.to.Earning.Ratio.t <- log_per
 plot(log_per)
 plot(density(log_per))
 
@@ -161,6 +206,20 @@ cor(log_per, tech$Return2, use="complete.obs")
 cor(log_per, tech$Return3, use="complete.obs") #0.05069594
 cor(tech$Price.to.Earning.Ratio, tech$Return3)
 cor(log_per, tech$Return4, use="complete.obs")
+
+
+
+### outliers lying >3*SD away of mean
+sd <- sd(tech$Price.to.Earning.Ratio) 
+mean <- mean(tech$Price.to.Earning.Ratio) 
+ci <- c(mean - 3*sd, mean + 3*sd)
+#sum(!tech$Price.to.Earning.Ratio %between% ci)# 17 outliers
+tech[!tech$Price.to.Earning.Ratio %between% ci, c('Ticker', 'Fiscal.Year')] ##outliers
+tech$Price.to.Earning.Ratio.out <- "False"
+tech$Price.to.Earning.Ratio.out[which(!tech$Price.to.Earning.Ratio %between% ci)] <- "True"
+plot(density(tech$Price.to.Earning.Ratio.t[tech$Price.to.Earning.Ratio.out=="False"]))
+
+
 ```
 
 Outliers:
@@ -183,12 +242,24 @@ plot(tech$Book.to.Market.Ratio) ## a few outliers with pretty high Book to Marke
 
 ## transformamtion
 log_bmr <- log(tech$Book.to.Market.Ratio)
+tech$Book.to.Market.Ratio.t <- log_bmr
 plot(log_bmr)
 plot(density(log_bmr)) ## a little right-skewed
 
 ## outliers
 fiveLargest <- tail(order(tech$Book.to.Market.Ratio), 5) ## indice for the five highest sales per share
 tech[fiveLargest, c("Ticker", "Fiscal.Year")]
+
+### outliers lying >3*SD away of mean
+sd <- sd(tech$Book.to.Market.Ratio) 
+mean <- mean(tech$Book.to.Market.Ratio) 
+ci <- c(mean - 3*sd, mean + 3*sd)
+#sum(!tech$Book.to.Market.Ratio %between% ci)# 5 outliers
+tech[!tech$Book.to.Market.Ratio %between% ci, c('Ticker', 'Fiscal.Year')] ##outliers
+tech$Book.to.Market.Ratio.out <- "False"
+tech$Book.to.Market.Ratio.out[which(!tech$Book.to.Market.Ratio %between% ci)] <- "True"
+plot(density(tech$Book.to.Market.Ratio.t[tech$Book.to.Market.Ratio.out=="False"]))
+
 
 
 cor(log_bmr, tech$Return)
@@ -212,6 +283,13 @@ Note: Same outliers as Sales per Share. Mostly the same as Earning per Share.
 
 
 
+## write columns to .csv file
+```{r}
+ratio_transformed_zhenzhen <- tech[, c(2:9, 20, 28:31, 36:45)]
+write.csv(ratio_transformed_zhenzhen,
+          "/Users/zhenzhenzhu/Documents/capstone/capstone_repository/data/ratio_transformed_zhenzhen.csv")
+```
+
 
 
 ## Correlation
@@ -232,7 +310,7 @@ summary(m1)
 
 ## linear reg with log transformed Return on Assets 
 ```{r}
-
+colnames(tech)
 ```
 
 
