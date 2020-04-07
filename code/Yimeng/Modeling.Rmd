@@ -351,36 +351,22 @@ ratios_t <- tech[c("Ticker","SimFinId", "Company.Name", "Sector", "Industry", "F
 setnames(ratios_t, old = c("Return.On.Capital.cube", "Return.On.Equity.cube", "Book.to.Market.Ratio.log", "Receivable.Turnover.log"), new = c("Return.On.Capital.t", "Return.On.Equity.t", "Book.to.Market.Ratio.t", "Receivable.Turnover.t"))
 
 stock_return$Year.adj <- stock_return$Year - 1L
+stock_return$Year <- NULL
 stock_return$Ticker <- as.character(stock_return$Ticker)
 ratios_t$Ticker <- as.character(ratios_t$Ticker)
-yimeng_transformed <- left_join(ratios_t, stock_return, by = c("Fiscal.Year" = "Year", "Ticker" = 'Ticker', "SimFinId" = 'SimFinId'))
-
+yimeng_transformed <- left_join(ratios_t, stock_return, by = c("Fiscal.Year" = "Year.adj", "Ticker" = 'Ticker', "SimFinId" = 'SimFinId'))
+#2085   24
 ```
 
 
-
-
-```{r}
-#check result
-cor(yimeng_transformed$Operating.Profit.Margin, yimeng_transformed$Return3)
-cor(yimeng_transformed$Return.On.Capital.t, yimeng_transformed$Return3)
-cor(yimeng_transformed$Return.On.Equity.t, yimeng_transformed$Return3)
-cor(yimeng_transformed$Receivable.Turnover.t, yimeng_transformed$Return3)
-cor(yimeng_transformed$Book.to.Market.Ratio.t, yimeng_transformed$Return3)
-
-# [1] 0.1294372
-# [1] 0.07710282
-# [1] 0.07230884
-# [1] 0.09234118
-# [1] -0.2368317
-```
 
 ############################################################write files to local####################################
 ```{r}
-
+write.csv(yimeng_transformed,"capstone_repository/data/yimeng_transformed_ratios.csv")
 ```
 
 
 
-
+<!-- model <- lm(Return3 ~ Operating.Profit.Margin + Receivable.Turnover.t, data=yimeng_transformed) -->
+<!-- summary(model) -->
 
