@@ -395,6 +395,8 @@ sum(is.na(ratio$Return.On.Capital)) #118
 sum(ratio$Return.On.Capital <0, na.rm=T) #1186
 ```
 
+
+
 Return On Equity: After Tax Operating Income/Total Equity
 ```{r}
 summary(ratio$After.Tax.Operating.Income)
@@ -426,6 +428,8 @@ ratio <- ratio %>% mutate(Return.On.Equity = ifelse( Total.Equity <= 0,NA,After.
 sum(is.na(ratio$Return.On.Equity)) #732
 sum(ratio$Return.On.Equity <0, na.rm=T) #1080
 ```
+
+
 
 Operating Profit Margin: Operating Income/ Revenue
 ```{r}
@@ -467,6 +471,8 @@ sum(is.na(ratio$Net.Profit.Margin)) #53
 sum(ratio$Net.Profit.Margin <0, na.rm=T) #3563
 ```
 
+
+
 Asset Turnover; Revenue/Total Asset(year-start)
 ```{r, message warning}
 #create a variable of year-start total asset
@@ -504,24 +510,6 @@ sum(ratio$Receivable.Turnover <0, na.rm=T) #0
 ```
 
 
-Inventory Turnover: Cost of Revenue/Inventory(year-start)
-- we drop this because 
-1. inventory has too many missing values 
-2. Cost.of.Revenue has many postive values which is weird. 
-```{r}
-#create a variable of year-start inventory
-ratio <- as.data.table(ratio)
-ratio[, Inventories.year.start := shift(Inventories, 1, 'lag'), by = Ticker]
-
-head(ratio[,c("Ticker","Inventories", "Inventories.year.start")], 20)
-sum(is.na(ratio$Inventories.year.start)) # 1750 missing
-sum(ratio$Inventories.year.start ==0, na.rm = T) #3634 zero
-
-summary(ratio$Cost.of.Revenue)
-#      Min.    1st Qu.     Median       Mean    3rd Qu.       Max. 
-#-3.853e+11 -3.051e+09 -7.931e+08 -5.075e+09 -1.251e+08  3.946e+09 
-sum(ratio$Cost.of.Revenue >0 , na.rm = T) #626
-```
 
 
 Book to Market Ratio: Stcok Price(year-end) * Shares(basic)/ Total Equity 
@@ -568,6 +556,10 @@ ratio <- ratio %>% mutate(Book.to.Market.Ratio = ifelse(Close ==0 , NA, (Total.E
 sum(is.na(ratio$Book.to.Market.Ratio)) #777
 sum(ratio$Book.to.Market.Ratio <0, na.rm=T) #573
 ```
+
+
+
+
 
 Earning Per Share: Net Income/ Shares
 ```{r}

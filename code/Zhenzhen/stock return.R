@@ -181,3 +181,4 @@ first_last[first_last$Ticker == "ARA" & first_last$Year == "2016",]
 #   1 ARA       84598 20160104  0.01  0.01        0 2016  0104 
 # 2 ARA       84598 20161230 21.3  21.3         0 2016  1230 
 
+

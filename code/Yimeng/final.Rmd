@@ -1,0 +1,497 @@
+---
+title: "Final code"
+output: html_notebook
+editor_options: 
+  chunk_output_type: inline
+---
+
+#####################################################Set up############################################
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = F)
+library(VIM)
+library(tidyverse)
+library(stringr)
+library(data.table)
+```
+
+
+import data
+```{r}
+df <- read.csv('capstone_repository/data/df.csv')
+
+tech <- df[df$Sector == 'Technology',]
+dim(tech)#2847   64
+```
+
+Select columns needed 
+```{r}
+col <-  c("Ticker","SimFinId", "Company.Name", "Industry", "Fiscal.Year", "Operating.Expenses","Revenue", "Accounts...Notes.Receivable","Total.Assets","Total.Liabilities","Shares..Diluted.", "Depreciation...Amortization","Total.Equity", "Income.Tax..Expense..Benefit..Net","Total.Current.Liabilities", "Total.Current.Assets", "Operating.Income..Loss.")
+
+df <- df[df$Sector == "Technology",col]
+```
+
+
+
+
+#####################################################Fill missing value############################################
+
+proportion of missing in each column
+```{r}
+sort(round(colMeans(!is.na(df))*100,2), decreasing = T)
+```
+
+Account Receivable: we need to have it, drop rows with this mising
+```{r}
+df <- df[!is.na(df$Accounts...Notes.Receivable),]
+dim(df) #2817   16
+```
+
+Depreciation and Amortization: fill with 0
+```{r}
+df$Depreciation...Amortization <- replace_na(df$Depreciation...Amortization, 0)
+```
+
+
+Income Tax Expense
+```{r}
+df$Income.Tax..Expense..Benefit..Net <- replace_na(df$Income.Tax..Expense..Benefit..Net, 0)
+
+sum(df$Income.Tax..Expense..Benefit..Net < 0) #2199, expenses are recorded as negative 
+```
+
+
+We want to analyze company that has positive equity value
+```{r}
+df <- df[df$Total.Equity >0, ]
+dim(df) #2721 17
+```
+
+
+
+######################################################### Calculating Ratios#############################################
+
+
+1.Performance measure: Book to Market Ratio (Total Equity /Stcok Price(year-end) * Shares(basic))
+```{r}
+#import stock price data
+stock <- fread('simfin_data/us-shareprices-daily.csv')
+stock$Year <- str_split_fixed(stock$Date,"-", n=3)[,1]
+stock$Date2 <- str_remove_all(stock$Date, "-")
+
+
+#find the year-end stock price 
+end_price <- stock %>% group_by(Ticker, Year) %>% mutate(year_end = max(Date2)) %>% filter(Date2 == year_end)%>% select(Ticker, SimFinId, Year, Close)
+end_price$SimFinId <- as.character(end_price$SimFinId)
+end_price$Year <- as.integer(end_price$Year)
+
+#join it with statement data 
+df$Ticker <- as.character(df$Ticker)
+df$SimFinId <- as.character(df$SimFinId)
+df$Fiscal.Year <- as.integer(df$Fiscal.Year)
+df <- left_join(df,end_price, by= c("Ticker", "SimFinId", "Fiscal.Year" = "Year"))
+df <- na.omit(df)
+dim(df)#2487   18
+
+#start calculation 
+df <- df %>% mutate(Book.to.Market.Ratio = ifelse(Close*Shares..Diluted. ==0 , NA, (Total.Equity/(Shares..Diluted. * Close))))
+
+sum(is.na(df$Book.to.Market.Ratio)) #0
+```
+
+
+2. Performance Measure: Sales Per Share (Revenue/ Shares)
+```{r}
+#start calculation 
+df <- df %>% mutate(Sales.Per.Share = ifelse(Shares..Diluted. ==0 , NA, Revenue/Shares..Diluted.))
+
+sum(is.na(df$Sales.Per.Share)) #0
+```
+
+
+3. Profitability Measure: Return On Equity (After Tax Operating Income/Total Equity)
+```{r}
+#calculat NOPAT:  Revenue + Depreciaton-Income Tax expense - Operating expenses 
+
+df <- df %>% mutate(After.Tax.Operating.Income = ifelse(Operating.Expenses >0,NA,Revenue - Depreciation...Amortization + Operating.Expenses + Income.Tax..Expense..Benefit..Net))
+
+summary(df$After.Tax.Operating.Income)
+sum(df$After.Tax.Operating.Income <0)#181
+
+
+#start calculation
+#we need to create a indicator telling whether 
+df <- df %>% mutate(Return.On.Equity = ifelse( Total.Equity <= 0,NA,After.Tax.Operating.Income/Total.Equity))
+
+
+sum(is.na(df$Return.On.Equity)) #0
+sum(df$Return.On.Equity <0, na.rm=T) #181
+```
+ 
+
+4.Efficiency Measure:  Operating Profit Margin(Operating Income/ Revenue)
+```{r}
+
+#start calculation
+df <- df %>% mutate(Operating.Profit.Margin = ifelse( Revenue == 0,NA,Operating.Income..Loss./Revenue))
+sum(is.na(df$Operating.Profit.Margin)) #0
+sum(df$Operating.Profit.Margin <0, na.rm=T) #624
+```
+
+
+5. Efficiency Measure: Receivable Turnover (Revenue/Account receivable year start)
+
+```{r, message warning}
+#create a variable of year-start account receivable
+df <- as.data.table(df)
+df[, Accounts...Notes.Receivable.year.start := shift(Accounts...Notes.Receivable, 1, 'lag'), by = Ticker]
+
+sum(is.na(df$Accounts...Notes.Receivable.year.start)) # 347 missing
+sum(df$Accounts...Notes.Receivable.year.start ==0, na.rm = T) #2 zero
+
+df <- df[!is.na(df$Accounts...Notes.Receivable.year.start), ]
+ dim(df)# 2140   24
+
+
+#calculate ratio
+df <- df %>% mutate(Receivable.Turnover = ifelse(Accounts...Notes.Receivable.year.start == 0, NA, Revenue/Accounts...Notes.Receivable.year.start))
+
+sum(is.na(df$Receivable.Turnover)) #2
+df <- df[!is.na(df$Receivable.Turnover),]
+sum(df$Receivable.Turnover <0, na.rm=T) #0
+```
+
+
+6. Leverage Measures: Total Debt Ratio (Total Liabilities/Total Assets)
+```{r}
+
+df <- df %>% mutate(Total.Debt.Ratio = ifelse(Total.Assets==0, NA, round(Total.Liabilities/Total.Assets,6)))
+
+
+sum(is.na(df$Total.Debt.Ratio))#0
+sum(df$Total.Debt.Ratio == 0, na.rm = T)#0
+sum(df$Total.Debt.Ratio < 0, na.rm = T)#0
+```
+
+
+7. Liquidity Measures: Current Ratio (Total Current Asset/ Total Current Liabilities)
+```{r}
+#start calculation
+df <- df %>% mutate(Current.Ratio = ifelse(Total.Current.Liabilities==0, NA, round(Total.Current.Assets/Total.Current.Liabilities,6)))
+
+sum(is.na(df$Current.Ratio)) #0
+sum(df$Current.Ratio == 0, na.rm = T)#0
+```
+
+
+check if no missing
+```{r}
+#sort(round(colMeans(!is.na(df))*100,2), decreasing = T)
+#no missing
+
+dim(df)#2138 27
+head(df)
+```
+
+select input columns
+```{r}
+df <- df[c("Ticker","SimFinId", "Company.Name", "Industry", "Fiscal.Year","Book.to.Market.Ratio","Sales.Per.Share", "Return.On.Equity","Operating.Profit.Margin","Receivable.Turnover","Total.Debt.Ratio","Current.Ratio")]
+```
+
+
+##############################################Join with response variable#####################################
+
+
+Set up
+```{r}
+stock <- read.csv2("simfin_data/us-shareprices-daily.csv")
+stock <- stock[c(1,2,3,4,7,9)] ## select relative columns
+stock$Year <- substring(date,1,4) ## extract Year
+stock$day <- str_sub(str_remove_all(stock$Date, "-"), start = 5)
+stock$day <- as.integer(stock$day)
+stock$Year <- as.integer(stock$Year)
+
+## fill NAs values in Dividend with 0
+stock$Dividend <- as.numeric(as.character(stock$Dividend))
+stock$Dividend <- replace_na(stock$Dividend,0)
+```
+
+
+Get dividends calculated 
+```{r}
+#change fiscal year to accounting year
+stock <- stock %>% group_by(Year) %>% mutate(Year.adj = ifelse(day <= 1031, Year, Year+1))
+
+#calculate total Dividend within a year
+totDiv <- stock %>% group_by(Ticker, Year.adj) %>% summarise(div =sum(Dividend)) 
+
+
+#get the stock price on 10-31 each year
+first_last <- stock %>% group_by(Ticker, Year.adj) %>% filter(row_number() %in% c(1, n()))
+first_last$Open <- as.numeric(as.character(first_last$Open))
+first_last$Close <- as.numeric(as.character(first_last$Close))
+```
+
+
+
+calculate stock return 
+```{r}
+#create a new data frame for stock return
+stock_return <- first_last[!duplicated(first_last[c("Ticker","Year.adj")]), c("Ticker","SimFinId","Year.adj")]
+
+#add dividends into the data frame 
+totDiv$Year.adj <- as.integer(totDiv$Year.adj)
+totDiv$Ticker <- as.character(totDiv$Ticker)
+stock_return$Year.adj <- as.integer(stock_return$Year.adj)
+stock_return$Ticker <- as.character(stock_return$Ticker)
+stock_return <- left_join(stock_return, totDiv, by=c("Ticker" , "Year.adj")) ## merge annual Dividend
+
+#calculate stock return
+stock_return$Return <- 0
+first_last$Ticker <- as.character(first_last$Ticker)
+first_last$Year.adj <- as.integer(first_last$Year.adj)
+for (i in 1:nrow(stock_return)) {
+  thisTicker <- stock_return$Ticker[i]
+  thisYear <- stock_return$Year.adj[i]
+  open <- as.numeric(first_last[first_last$Ticker==thisTicker & first_last$Year.adj==thisYear, "Open"][1,])
+  close <- as.numeric(first_last[first_last$Ticker==thisTicker & first_last$Year.adj==thisYear, "Close"][2,])
+  div <- as.numeric(stock_return$div[i])
+  stock_return$Return[i] <- (log(close + div) - log(open))
+}
+dim(stock_return)
+
+stock_return <- stock_return[c("Ticker", "Year.adj", "Return")]
+```
+
+
+
+join with financial ratios
+```{r}
+stock_return$Year.adj.adj <-  stock_return$Year.adj -1L
+
+train <- left_join(df, stock_return, by = c("Ticker", "Fiscal.Year" = "Year.adj")) #return_t 和 ratio_tjoin
+train <- left_join(train, stock_return, by =c("Ticker", "Fiscal.Year" = "Year.adj.adj")) #return_t 和ratio_t-1 join
+
+#get rid of unnecessary columsn
+train$Year.adj <- NULL
+train$Year.adj.adj <- NULL
+
+sum(is.na(train$Return.x)) #0 
+sum(is.na(train$Return.y)) #2
+
+train <- na.omit(train)
+```
+
+
+
+########################################################Exploratory analysis#########################################
+
+correlation among variables
+```{r}
+cor(train[-c(1:5)])
+```
+
+
+(1)Book.to.Market.Ratio
+```{r}
+summary(train$Book.to.Market.Ratio)
+#     Min.   1st Qu.    Median      Mean   3rd Qu.      Max. 
+#   0.0042    0.2023    0.3562    2.7700    0.6356 1326.5407 
+
+#right skewed 
+ggplot(train) + geom_histogram(aes(x = Book.to.Market.Ratio))
+```
+
+log transformation did make the distribution more enormal
+```{r}
+train$Book.to.Market.Ratio.log <- log(train$Book.to.Market.Ratio)
+
+ggplot(train) + geom_histogram(aes(x = Book.to.Market.Ratio.log))
+```
+
+
+(2)Sales.Per.Share 
+
+```{r}
+summary(train$Sales.Per.Share)
+#      Min.   1st Qu.    Median      Mean   3rd Qu.      Max. 
+#    0.054     5.215     9.110    44.352    18.363 29675.850 
+
+#right skewed 
+ggplot(train) + geom_histogram(aes(x = Book.to.Market.Ratio))
+```
+
+
+log transformation made the distribution normal 
+```{r}
+train$Sales.Per.Share.log <- log(train$Sales.Per.Share)
+
+ggplot(train) + geom_histogram(aes(x = Sales.Per.Share.log))
+```
+
+
+(3)Return.On.Equity
+
+```{r}
+summary(train$Return.On.Equity)
+#   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+#-4.4741  0.3011  0.5887  1.1834  1.2246 54.0948 
+
+#right skewed 
+ggplot(train) + geom_histogram(aes(x = Return.On.Equity))
+```
+
+
+```{r}
+Math.log <- function(x){
+  sign(x) * log(abs(x) + 1)
+}
+
+train$Return.On.Equity.log <- Math.log(train$Return.On.Equity)
+
+  
+ggplot(train) + geom_histogram(aes(x = Return.On.Equity.log))
+```
+
+
+(4)Operating.Profit.Margin
+```{r}
+summary(train$Operating.Profit.Margin)
+#     Min.   1st Qu.    Median      Mean   3rd Qu.      Max. 
+#-42.79674   0.00462   0.08029   0.01382   0.17372   0.62948 
+
+#right skewed 
+ggplot(train) + geom_histogram(aes(x = Operating.Profit.Margin))
+```
+
+
+still a little bit skewed but better 
+```{r}
+Math.log <- function(x){
+  sign(x) * log(abs(x) + 1)
+}
+
+#remove 4 outliers 
+sum(train$Operating.Profit.Margin <  -5) #4 
+
+train <- train[train$Operating.Profit.Margin >= -5,]
+train$Operating.Profit.Margin.log <- Math.log(train$Operating.Profit.Margin)
+
+  
+ggplot(train) + geom_histogram(aes(x = Operating.Profit.Margin.log))
+```
+
+
+(5)Receivable.Turnover
+```{r}
+summary(train$Receivable.Turnover)
+#     Min.   1st Qu.    Median      Mean   3rd Qu.      Max. 
+#    0.206     5.351     6.920    17.575     9.268 12142.177 
+
+#right skewed 
+ggplot(train) + geom_histogram(aes(x = Receivable.Turnover))
+```
+
+more normal 
+```{r}
+train$Receivable.Turnover.log <- log(train$Receivable.Turnover)
+
+ggplot(train) + geom_histogram(aes(x = Receivable.Turnover.log))
+```
+
+
+(6)Total.Debt.Ratio 
+```{r}
+summary(train$Total.Debt.Ratio)
+# Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+#0.01132 0.25130 0.39539 0.41895 0.57604 0.99289
+
+#right skewed 
+ggplot(train) + geom_histogram(aes(x = Total.Debt.Ratio))
+```
+
+pretty normal
+```{r}
+train$Total.Debt.Ratio.log <- log(train$Total.Debt.Ratio+ 1.1)
+
+ggplot(train) + geom_histogram(aes(x = Total.Debt.Ratio.log))
+```
+
+
+(7)Current.Ratio
+```{r}
+summary(train$Current.Ratio)
+#Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+#  0.241   1.612   2.407   3.305   3.914  33.035
+#right skewed 
+ggplot(train) + geom_histogram(aes(x = Current.Ratio))
+```
+
+
+very normal after transformation
+```{r}
+train$Current.Ratio.log <- log(train$Current.Ratio )
+
+ggplot(train) + geom_histogram(aes(x = Current.Ratio.log))
+```
+
+
+check correlation
+```{r}
+cor(train[-c(1:5)])
+```
+
+
+####################################################Predictive Linear regression model#################################################
+
+ 
+```{r}
+table(train$Fiscal.Year)
+
+#predict 2016
+train2016 <- train[train$Fiscal.Year < 2016,]
+test2016 <- train[train$Fiscal.Year == 2016,]
+
+model2016 <- lm(Return.y ~ Book.to.Market.Ratio.log + Sales.Per.Share.log + Return.On.Equity.log + Operating.Profit.Margin.log + Receivable.Turnover.log + Total.Debt.Ratio.log+Current.Ratio.log, data=train2016)
+
+distPred2016 <- predict(model2016, test2016)  # predict distance
+actuals_preds2016 <- data.frame(cbind(test2016[1:5], actuals=test2016$Return.y, predicteds=distPred2016)) 
+
+
+actuals_preds2016[order(-actuals_preds2016$predicteds),][1:10,] %>% summarise(totreturn = mean(actuals))#good: 0.2341269			
+actuals_preds2016[order(actuals_preds2016$predicteds),][1:10,] %>% summarise(totreturn = mean(actuals))#bad: 0.1485242			
+```
+
+
+```{r}
+#predict 2017
+train2017 <- train[train$Fiscal.Year < 2017,]
+test2017 <- train[train$Fiscal.Year == 2017,]
+
+model2017 <- lm(Return.y ~ Book.to.Market.Ratio.log + Sales.Per.Share.log + Return.On.Equity.log + Operating.Profit.Margin.log + Receivable.Turnover.log + Total.Debt.Ratio.log+Current.Ratio.log, data=train2017)
+
+distPred2017 <- predict(model2017, test2017)  # predict distance
+actuals_preds2017 <- data.frame(cbind(test2017[1:5], actuals=test2017$Return.y, predicteds=distPred2017)) 
+
+
+actuals_preds2017[order(-actuals_preds2017$predicteds),][1:10,] %>% summarise(totreturn = sum(actuals))#good: 0.06648518		
+actuals_preds2017[order(actuals_preds2017$predicteds),][1:10,] %>% summarise(totreturn = sum(actuals))#bad: -0.1960739	
+
+```
+
+
+```{r}
+#predict 2018
+train2018 <- train[train$Fiscal.Year < 2018,]
+test2018 <- train[train$Fiscal.Year == 2018,]
+
+model2018 <- lm(Return.y ~ Book.to.Market.Ratio.log + Sales.Per.Share.log + Return.On.Equity.log + Operating.Profit.Margin.log + Receivable.Turnover.log + Total.Debt.Ratio.log+Current.Ratio.log, data=train2018)
+
+distPred2018 <- predict(model2018, test2018)  # predict distance
+actuals_preds2018 <- data.frame(cbind(test2018[1:5], actuals=test2018$Return.y, predicteds=distPred2018)) 
+
+
+actuals_preds2018[order(-actuals_preds2018$predicteds),][1:10,] %>% summarise(totreturn = sum(actuals)) #0.0710043	
+actuals_preds2018[order(actuals_preds2018$predicteds),][1:10,] %>% summarise(totreturn = sum(actuals)) #0.06810365	
+```
+

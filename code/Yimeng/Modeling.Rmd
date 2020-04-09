@@ -367,6 +367,6 @@ write.csv(yimeng_transformed,"capstone_repository/data/yimeng_transformed_ratios
 
 
 
-<!-- model <- lm(Return3 ~ Operating.Profit.Margin + Receivable.Turnover.t, data=yimeng_transformed) -->
-<!-- summary(model) -->
+model <- lm(Return3 ~ Return.On.Capital.t, data=yimeng_transformed) 
+summary(model)
 

@@ -18,15 +18,23 @@ Import data that includes all columns from 3 statements
 Proportion of missing value in each column 
 ```{r}
 df <- read.csv('capstone_repository/data/df.csv')
-prop_missing <- sort(round(colMeans(!is.na(df))*100,2), decreasing = T)
 ```
 
 Check the proportion of missing in tech sector
 ```{r}
-col <- cols <- c("Ticker","SimFinId", "Company.Name", "IndustryId","Sector", "Industry", "Report.Date","Fiscal.Year","Fiscal.Period", "Publish.Date", "Revenue", "Cost.of.Revenue", "Total.Assets","Total.Current.Assets","Total.Liabilities", "Total.Current.Liabilities", "Cash..Cash.Equivalents...Short.Term.Investments", "Accounts...Notes.Receivable", "Long.Term.Debt", "Total.Equity", "Short.Term.Debt", "Operating.Income..Loss.", "Interest.Expense..Net", "Depreciation...Amortization","Operating.Expenses", "Income.Tax..Expense..Benefit..Net", "Net.Income..Common.", "Inventories", "Shares..Diluted.", "Dividends.Paid")
-complete_tech <- na.omit(df[df$Sector == 'Technology',col])
-dim(complete_tech) #only 814 tech companies has complete data that we need 
+col <-  c("Ticker","SimFinId", "Company.Name", "IndustryId","Sector", "Industry", "Report.Date","Fiscal.Year","Fiscal.Period", "Publish.Date", "Revenue", "Cost.of.Revenue", "Total.Assets","Total.Current.Assets","Total.Liabilities", "Total.Current.Liabilities", "Cash..Cash.Equivalents...Short.Term.Investments", "Accounts...Notes.Receivable", "Long.Term.Debt", "Total.Equity", "Short.Term.Debt", "Operating.Income..Loss.", "Interest.Expense..Net","Operating.Expenses", "Income.Tax..Expense..Benefit..Net", "Net.Income..Common.", "Shares..Diluted.", "Depreciation...Amortization")
+dim(na.omit(df[,col]))
+comple <- na.omit(df[,col])
 
+n_distinct(comple$Ticker)# 1101 
+comple <- comple %>% group_by(Ticker) %>% mutate(n_years = n_distinct(Fiscal.Year))
+id <- comple[comple$n_years >=8, c('Ticker','Fiscal.Year')]
+
+
+complete_tech <- na.omit(df[df$Sector == 'Technology',col])
+dim(complete_tech) #only 11911 observations  has complete data that we need 
+n_distinct(complete_tech$Ticker)# only 218 companies has complete data 
+complete_tech %>% group_by(Ticker) %>% summarise(n_years = n()) %>% group_by(n_years) %>% summarise(n_comp = n_distinct(Ticker))
 ```
 
 proportion of missing in each column
