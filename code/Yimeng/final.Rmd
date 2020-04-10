@@ -201,13 +201,15 @@ stock$Year <- as.integer(stock$Year)
 ## fill NAs values in Dividend with 0
 stock$Dividend <- as.numeric(as.character(stock$Dividend))
 stock$Dividend <- replace_na(stock$Dividend,0)
+
+stock_save <- copy(stock)
 ```
 
 
 Get dividends calculated 
 ```{r}
 #change fiscal year to accounting year
-stock <- stock %>% group_by(Year) %>% mutate(Year.adj = ifelse(day <= 1031, Year, Year+1))
+stock <- stock %>% group_by(Year) %>% mutate(Year.adj = ifelse(day <= 1031, Year, Year))
 
 #calculate total Dividend within a year
 totDiv <- stock %>% group_by(Ticker, Year.adj) %>% summarise( totdiv =sum(Dividend)) 
@@ -267,7 +269,6 @@ stock_return <- stock_return[c("Ticker", "Year.adj", "logreturn", "actual_re")]
 
 join with financial ratios
 ```{r}
-stock_return$Year.adj.adj <-  stock_return$Year.adj -1L
 
 ratio_return <- left_join(df, stock_return, by =c("Ticker", "Fiscal.Year" = "Year.adj")) #return_t 和ratio_t-1 join
 
@@ -447,6 +448,9 @@ ggplot(train) + geom_histogram(aes(x = Current.Ratio.log))
 check correlation
 ```{r}
 cor(train[-c(1:5)])
+```
+```{r}
+write.csv(train, "capstone_repository/data/train.csv")
 ```
 
 
