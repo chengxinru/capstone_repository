@@ -946,9 +946,10 @@ Finally we picked
 1. Operating profit margin
 2. receivable turn over 
 3. Total Debt ratio
-4. Saales Per share 
+4. Sales Per share 
 5. Book to market ratio
 6. Return on Equity 
+7. Current Ratio
 
 ```{r}
 xy$Fiscal.Year <- as.integer(xy$Fiscal.Year)
