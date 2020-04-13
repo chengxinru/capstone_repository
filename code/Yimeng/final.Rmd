@@ -148,6 +148,9 @@ df <- df[!is.na(df$Receivable.Turnover),]
 sum(df$Receivable.Turnover <0, na.rm=T) #0
 ```
 
+```{r}
+sd(train[c(6:14)])
+```
 
 6. Leverage Measures: Total Debt Ratio (Total Liabilities/Total Assets)
 ```{r}
@@ -272,8 +275,6 @@ join with financial ratios
 
 ratio_return <- left_join(df, stock_return, by =c("Ticker", "Fiscal.Year" = "Year.adj")) #return_t 和ratio_t-1 join
 
-#get rid of unnecessary columsn
-ratio_return$Year.adj.adj<- NULL
 
 sum(is.na(ratio_return$actual_re)) #2
 sum(is.na(ratio_return$logreturn)) #2
@@ -453,41 +454,32 @@ cor(train[-c(1:5)])
 write.csv(train, "capstone_repository/data/train.csv")
 ```
 
+########################################################Correlation Analysis ############################################
+
+
+```{r}
+library(ggcorrplot)
+corr <- round(cor(train[c(15:21,13,14)]), 3)
+ggcorrplot(corr, hc.order = TRUE, type = "lower",
+   lab = TRUE, outline.col = "white",
+   ggtheme = ggplot2::theme_gray,
+   colors = c("#6D9EC1", "white", "#E46726"),lab_size = 3)
+```
+
 
 ####################################################Predictive Linear regression model#################################################
+
+variable importance test
 ```{r}
-#predict 2014
-train2014 <- train[train$Fiscal.Year < 2014,]
-test2014 <- train[train$Fiscal.Year == 2014,]
+model <- lm(logreturn ~ Book.to.Market.Ratio.log + Sales.Per.Share.log + Return.On.Equity.log + Operating.Profit.Margin.log + Receivable.Turnover.log + Total.Debt.Ratio.log+Current.Ratio.log, data=train[train$Fiscal.Year == 2016,])
+summary(model)
 
-model2014 <- glm(logreturn ~ Book.to.Market.Ratio.log + Sales.Per.Share.log + Return.On.Equity.log + Operating.Profit.Margin.log + Receivable.Turnover.log + Total.Debt.Ratio.log+Current.Ratio.log, data=train2014)
-
-distPred2014 <- predict(model2014, test2014)  # predict distance
-actuals_preds2014 <- data.frame(cbind(test2014[c(1:5,14)], actuals=test2014$actual_re, predicteds=distPred2014)) 
-
-
-actuals_preds2014[order(-actuals_preds2014$predicteds),][1:5,] %>% summarise(totreturn = mean(actual_re))#good: 0.3006662		
-actuals_preds2014[order(actuals_preds2014$predicteds),][1:5,] %>% summarise(totreturn = mean(actual_re))#bad: 0.05608732		
 ```
 
-```{r}
-#predict 2015
-train2015 <- train[train$Fiscal.Year < 2015 & train$Fiscal.Year >= 2010,]
-test2015 <- train[train$Fiscal.Year == 2015,]
-
-model2015 <- glm(logreturn ~ Book.to.Market.Ratio.log + Sales.Per.Share.log + Return.On.Equity.log + Operating.Profit.Margin.log + Receivable.Turnover.log + Total.Debt.Ratio.log+Current.Ratio.log, data=train2015)
-
-distPred2015 <- predict(model2015, test2015)  # predict distance
-actuals_preds2015 <- data.frame(cbind(test2015[c(1:5,14)], actuals=test2015$actual_re, predicteds=distPred2015)) 
-
-
-actuals_preds2015[order(-actuals_preds2015$predicteds),][1:5,] %>% summarise(totreturn = mean(actual_re))#good: 0.02671635				
-actuals_preds2015[order(actuals_preds2015$predicteds),][1:5,] %>% summarise(totreturn = mean(actual_re))#bad: -0.02587445				
-```
  
 ```{r}
 #predict 2016
-train2016 <- train[train$Fiscal.Year < 2016 & train$Fiscal.Year >= 2010,]
+train2016 <- train[train$Fiscal.Year < 2016,]
 test2016 <- train[train$Fiscal.Year == 2016,]
 
 model2016 <- glm(logreturn ~ Book.to.Market.Ratio.log + Sales.Per.Share.log + Return.On.Equity.log + Operating.Profit.Margin.log + Receivable.Turnover.log + Total.Debt.Ratio.log+Current.Ratio.log, data=train2016)
@@ -496,8 +488,8 @@ distPred2016 <- predict(model2016, test2016)  # predict distance
 actuals_preds2016 <- data.frame(cbind(test2016[c(1:5,14)], actuals=test2016$actual_re, predicteds=distPred2016)) 
 
 
-actuals_preds2016[order(-actuals_preds2016$predicteds),][1:5,] %>% summarise(totreturn = mean(actual_re))#good: 0.350472				
-actuals_preds2016[order(actuals_preds2016$predicteds),][1:5,] %>% summarise(totreturn = mean(actual_re))#bad: 0.2266411					
+actuals_preds2016[order(-actuals_preds2016$predicteds),][1:10,] %>% summarise(totreturn = mean(actuals))#good: 0.5277509					
+actuals_preds2016[order(actuals_preds2016$predicteds),][1:10,] %>% summarise(totreturn = mean(actuals))#bad: 0.3029431						
 ```
 
 
@@ -512,8 +504,8 @@ distPred2017 <- predict(model2017, test2017)  # predict distance
 actuals_preds2017 <- data.frame(cbind(test2017[c(1:5,14)], actuals=test2017$actual_re, predicteds=distPred2017)) 
 
 
-actuals_preds2017[order(-actuals_preds2017$predicteds),][1:5,] %>% summarise(totreturn = mean(actuals))#good: 0.03060938					
-actuals_preds2017[order(actuals_preds2017$predicteds),][1:5,] %>% summarise(totreturn = mean(actuals))#bad: 0.06896462	
+actuals_preds2017[order(-actuals_preds2017$predicteds),][1:5,] %>% summarise(totreturn = mean(actuals))#good: 0.6206422						
+actuals_preds2017[order(actuals_preds2017$predicteds),][1:5,] %>% summarise(totreturn = mean(actuals))#bad: 0.0552313		
 
 
 ```
@@ -527,11 +519,11 @@ test2018 <- train[train$Fiscal.Year == 2018,]
 model2018 <- glm(logreturn ~ Book.to.Market.Ratio.log + Sales.Per.Share.log + Return.On.Equity.log + Operating.Profit.Margin.log + Receivable.Turnover.log + Total.Debt.Ratio.log+Current.Ratio.log + Industry, data=train2018)
 
 distPred2018 <- predict(model2018, test2018)  # predict distance
-actuals_preds2018 <- data.frame(cbind(test2018[c(1:5,14)], actuals=test2018$logreturn, predicteds=distPred2018)) 
+actuals_preds2018 <- data.frame(cbind(test2018[c(1:5,14)], actuals=test2018$actual_re, predicteds=distPred2018)) 
 
 
-actuals_preds2018[order(-actuals_preds2018$predicteds),][1:5,] %>% summarise(totreturn = mean(actual_re))#good: 0.1329313						
-actuals_preds2018[order(actuals_preds2018$predicteds),][1:5,] %>% summarise(totreturn = mean(actual_re))#bad: 0.2015754		
+actuals_preds2018[order(-actuals_preds2018$predicteds),][1:5,] %>% summarise(totreturn = mean(actuals))#good: 0.1329313						
+actuals_preds2018[order(actuals_preds2018$predicteds),][1:5,] %>% summarise(totreturn = mean(actuals))#bad: 0.2015754		
 	
 ```
 
